@@ -13,6 +13,10 @@ import BrandDeals from './pages/BrandDeals'
 import Create from './pages/Create'
 import Settings from './pages/Settings'
 import AuthCallback from './pages/AuthCallback'
+import FAQ from './pages/FAQ'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import Footer from './components/Footer'
 
 const FEEDBACK_FORM_URL = 'https://forms.gle/p5cBXw4sYaHPdcANA'
 
@@ -75,8 +79,12 @@ export default function App() {
         <Route path="/create" element={<Create />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/faq" element={<FAQ />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Footer />
       <FeedbackButton />
       <Analytics />
     </BrowserRouter>

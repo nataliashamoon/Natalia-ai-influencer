@@ -18,7 +18,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import Footer from './components/Footer'
 
-const FEEDBACK_FORM_URL = 'https://forms.gle/p5cBXw4sYaHPdcANA'
+const FEEDBACK_FORM_URL = 'https://forms.gle/pU62hcxHzGnJrfxo7'
 
 function FeedbackButton() {
   const { isDark } = useTheme()

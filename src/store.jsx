@@ -1,4 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
+import { supabase } from './utils/supabase'
+import { useAuth } from './context/auth'
 
 // Generic small-value localStorage hook (inspiration boards, brand deals, etc.)
 function useLocalStorage(key, initial) {
@@ -430,8 +432,58 @@ const TEMPLATE_IDS = new Set(['kayla-template', 'camila-template', 'marcus-templ
 
 export function StoreProvider({ children }) {
   const influencerStore = useInfluencerStore([KAYLA_SEED, CAMILA_SEED, MARCUS_SEED])
+  const [influencers, setInfluencers] = influencerStore
   const inspirationState = useLocalStorage('inspiration_boards', [])
   const brandDealsState  = useLocalStorage('brand_deals', [])
+
+  const { user } = useAuth()
+  const [supabaseSynced, setSupabaseSynced] = useState(false)
+
+  // Load from Supabase when user logs in
+  useEffect(() => {
+    if (!user) { setSupabaseSynced(false); return }
+    setSupabaseSynced(false)
+
+    supabase
+      .from('influencers')
+      .select('id, data, sort_order')
+      .order('sort_order')
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          const remoteIds = data.map(r => r.id)
+          const currentIds = readIds() || []
+          const remoteIdSet = new Set(remoteIds)
+          const localOnlyIds = currentIds.filter(id => !remoteIdSet.has(id))
+          const mergedIds = [...remoteIds, ...localOnlyIds]
+
+          for (const row of data) writeInfluencer(row.data)
+          writeIds(mergedIds)
+
+          const merged = mergedIds.map(readInfluencer).filter(Boolean)
+          setInfluencers(merged)
+        }
+        setSupabaseSynced(true)
+      })
+      .catch(() => setSupabaseSynced(true))
+  }, [user?.id]) // eslint-disable-line
+
+  // Save to Supabase whenever influencers change
+  useEffect(() => {
+    if (!user || !supabaseSynced) return
+    const timer = setTimeout(async () => {
+      const rows = influencers.map((inf, idx) => ({
+        id: inf.id,
+        user_id: user.id,
+        data: inf,
+        sort_order: idx,
+      }))
+      const { error } = await supabase
+        .from('influencers')
+        .upsert(rows, { onConflict: 'id,user_id' })
+      if (error) console.warn('[supabase] save error:', error)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [influencers, user?.id, supabaseSynced]) // eslint-disable-line
   const [, setInspirationBoards] = inspirationState
   const [, setDealsData]         = brandDealsState
 

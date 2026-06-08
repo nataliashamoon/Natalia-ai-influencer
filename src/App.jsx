@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider, useTheme } from './context/theme'
+import { AuthProvider } from './context/auth'
 import { StoreProvider } from './store'
 import { silentRefreshHFToken } from './utils/higgsfieldAuth'
 import Nav from './components/Nav'
@@ -62,6 +63,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+    <AuthProvider>
     <StoreProvider>
     <BrowserRouter>
       <Nav />
@@ -79,6 +81,7 @@ export default function App() {
       <Analytics />
     </BrowserRouter>
     </StoreProvider>
+    </AuthProvider>
     </ThemeProvider>
   )
 }

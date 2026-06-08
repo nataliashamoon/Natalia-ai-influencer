@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/theme'
+import { useAuth } from '../context/auth'
 
 const links = [
   { to: '/influencers', label: 'Influencers' },
@@ -10,6 +11,7 @@ const links = [
 export default function Nav() {
   const { pathname } = useLocation()
   const { isDark, toggle } = useTheme()
+  const { user, signInWithGoogle, signOut } = useAuth()
   const landing = pathname === '/'
   const dark = landing || isDark
 
@@ -123,6 +125,38 @@ export default function Nav() {
             </svg>
           )}
         </button>
+
+        {user ? (
+          <button
+            onClick={signOut}
+            title={`Signed in as ${user.email} — click to sign out`}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', border: 'none',
+              cursor: 'pointer', padding: 0, overflow: 'hidden',
+              background: dark ? 'rgba(255,255,255,0.15)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700, color: '#fff',
+              flexShrink: 0,
+            }}
+          >
+            {user.user_metadata?.avatar_url
+              ? <img src={user.user_metadata.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+              : (user.email?.[0] ?? '?').toUpperCase()
+            }
+          </button>
+        ) : (
+          <button
+            onClick={signInWithGoogle}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: dark ? 'rgba(255,255,255,0.10)' : 'var(--bg-tertiary)',
+              color: dark ? 'rgba(255,255,255,0.80)' : 'var(--text-primary)',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >
+            Sign in
+          </button>
+        )}
 
         <NavLink to="/settings" title="Settings" style={({ isActive }) => ({
           width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',

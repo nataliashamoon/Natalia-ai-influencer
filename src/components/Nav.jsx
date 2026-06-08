@@ -13,19 +13,10 @@ export default function Nav() {
   const { isDark, toggle } = useTheme()
   const { user, signInWithGoogle, signOut } = useAuth()
   const landing = pathname === '/'
-  const dark = landing || isDark
+  const dark = isDark
 
-  const navBg = landing
-    ? 'transparent'
-    : isDark
-    ? 'rgba(7,7,14,0.88)'
-    : 'rgba(255,255,255,0.80)'
-
-  const navBorder = landing
-    ? 'none'
-    : isDark
-    ? '1px solid rgba(255,255,255,0.07)'
-    : '1px solid rgba(0,0,0,0.06)'
+  const navBg = isDark ? 'rgba(7,7,14,0.88)' : 'rgba(255,255,255,0.80)'
+  const navBorder = isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.06)'
 
   return (
     <nav className="nav-root" style={{

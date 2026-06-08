@@ -27,10 +27,10 @@ export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     if (!localStorage.getItem('theme_default_v2')) {
       localStorage.setItem('theme_default_v2', '1')
-      localStorage.setItem('theme', 'dark')
-      return 'dark'
+      localStorage.setItem('theme', 'light')
+      return 'light'
     }
-    return localStorage.getItem('theme') || 'dark'
+    return localStorage.getItem('theme') || 'light'
   })
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTheme } from '../context/theme'
 
 const WORDS = ['Influencer', 'Creator', 'Avatar', 'Celebrity']
 const TYPE_SPEED = 75
@@ -62,6 +63,7 @@ const CARDS = [
 
 export default function Landing() {
   const navigate = useNavigate()
+  const { isDark } = useTheme()
   const animatedWord = useTypewriter()
 
   // Per-card: which image src + whether currently fading out
@@ -103,19 +105,19 @@ export default function Landing() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#FFFFFF',
+      background: isDark ? '#07070E' : '#FFFFFF',
       overflow: 'hidden',
       padding: 'calc(var(--nav-h) + 40px) 24px 80px',
       textAlign: 'center',
     }}>
 
       {/* Orbs */}
-      <div style={{ position:'absolute', width:760, height:760, top:'-22%', left:'-18%', borderRadius:'50%', background:'radial-gradient(circle, rgba(236,72,153,0.18) 0%, transparent 65%)', animation:'orb1 14s ease-in-out infinite', pointerEvents:'none' }}/>
-      <div style={{ position:'absolute', width:620, height:620, top:'-14%', right:'-12%', borderRadius:'50%', background:'radial-gradient(circle, rgba(0,113,227,0.14) 0%, transparent 65%)', animation:'orb2 19s ease-in-out infinite', pointerEvents:'none' }}/>
-      <div style={{ position:'absolute', width:820, height:820, bottom:'-32%', left:'18%', borderRadius:'50%', background:'radial-gradient(circle, rgba(139,92,246,0.13) 0%, transparent 65%)', animation:'orb3 23s ease-in-out infinite', pointerEvents:'none' }}/>
+      <div style={{ position:'absolute', width:760, height:760, top:'-22%', left:'-18%', borderRadius:'50%', background:`radial-gradient(circle, rgba(236,72,153,${isDark?'0.28':'0.18'}) 0%, transparent 65%)`, animation:'orb1 14s ease-in-out infinite', pointerEvents:'none' }}/>
+      <div style={{ position:'absolute', width:620, height:620, top:'-14%', right:'-12%', borderRadius:'50%', background:`radial-gradient(circle, rgba(0,113,227,${isDark?'0.22':'0.14'}) 0%, transparent 65%)`, animation:'orb2 19s ease-in-out infinite', pointerEvents:'none' }}/>
+      <div style={{ position:'absolute', width:820, height:820, bottom:'-32%', left:'18%', borderRadius:'50%', background:`radial-gradient(circle, rgba(139,92,246,${isDark?'0.18':'0.13'}) 0%, transparent 65%)`, animation:'orb3 23s ease-in-out infinite', pointerEvents:'none' }}/>
 
       {/* Dot grid */}
-      <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(rgba(0,0,0,0.07) 1px, transparent 1px)', backgroundSize:'32px 32px', pointerEvents:'none' }}/>
+      <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.07)'} 1px, transparent 1px)`, backgroundSize:'32px 32px', pointerEvents:'none' }}/>
 
       {/* ── Floating influencer cards ── */}
       {CARDS.map((card, i) => {
@@ -145,7 +147,7 @@ export default function Landing() {
               animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`,
               borderRadius: 18,
               overflow: 'hidden',
-              boxShadow: '0 28px 70px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.07)',
+              boxShadow: isDark ? '0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)' : '0 28px 70px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.07)',
               opacity: cardFade[i] ? 0 : 1,
               transition: 'opacity 0.75s ease',
             }}>
@@ -154,7 +156,7 @@ export default function Landing() {
                 alt=""
                 style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }}
               />
-              <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,0.25) 0%, transparent 55%)' }}/>
+              <div style={{ position:'absolute', inset:0, background:`linear-gradient(to top, rgba(0,0,0,${isDark?'0.45':'0.25'}) 0%, transparent 55%)` }}/>
             </div>
           </div>
         )
@@ -163,7 +165,7 @@ export default function Landing() {
       {/* Vignette */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(255,255,255,0.88) 100%)',
+        background: isDark ? 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.82) 100%)' : 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(255,255,255,0.88) 100%)',
         pointerEvents: 'none', zIndex: 1,
       }}/>
 
@@ -171,7 +173,7 @@ export default function Landing() {
       <div style={{ maxWidth: 680, position: 'relative', zIndex: 2 }}>
 
 
-        <h1 style={{ fontSize:'clamp(62px,10vw,104px)', fontWeight:800, letterSpacing:'-3.5px', lineHeight:1.0, color:'#1D1D1F', marginBottom:2 }}>
+        <h1 style={{ fontSize:'clamp(62px,10vw,104px)', fontWeight:800, letterSpacing:'-3.5px', lineHeight:1.0, color: isDark ? '#fff' : '#1D1D1F', marginBottom:2 }}>
           Create Your
         </h1>
 
@@ -185,7 +187,7 @@ export default function Landing() {
           <span style={{ display:'inline-block', width:5, height:'0.72em', background:'linear-gradient(to bottom, #EC4899, #A855F7)', marginLeft:6, borderRadius:3, animation:'blink 1s step-end infinite', verticalAlign:'middle', flexShrink:0 }}/>
         </div>
 
-        <p style={{ fontSize:20, color:'rgba(0,0,0,0.42)', lineHeight:1.65, margin:'0 auto 52px', maxWidth:420, fontWeight:400, letterSpacing:'-0.1px' }}>
+        <p style={{ fontSize:20, color: isDark ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.42)', lineHeight:1.65, margin:'0 auto 52px', maxWidth:420, fontWeight:400, letterSpacing:'-0.1px' }}>
           Build, manage, and grow your AI influencers.
         </p>
 

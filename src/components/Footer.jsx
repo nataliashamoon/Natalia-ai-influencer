@@ -5,13 +5,13 @@ export default function Footer() {
   const { isDark } = useTheme()
   const { pathname } = useLocation()
 
-  if (pathname === '/') return null
+  const isLanding = pathname === '/'
 
   return (
     <footer style={{
       width: '100%',
-      borderTop: `1px solid var(--border)`,
-      background: 'var(--bg)',
+      borderTop: isLanding ? '1px solid rgba(255,255,255,0.08)' : '1px solid var(--border)',
+      background: isLanding ? '#07070E' : 'var(--bg)',
       padding: '20px 28px',
       display: 'flex',
       alignItems: 'center',
@@ -20,7 +20,7 @@ export default function Footer() {
       gap: 12,
       marginTop: 'auto',
     }}>
-      <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+      <span style={{ fontSize: 13, color: isLanding ? 'rgba(255,255,255,0.28)' : 'var(--text-tertiary)', fontWeight: 500 }}>
         © {new Date().getFullYear()} Influencer Studio
       </span>
 
@@ -32,13 +32,13 @@ export default function Footer() {
         ].map(({ to, label }) => (
           <Link key={to} to={to} style={{
             fontSize: 13,
-            color: 'var(--text-secondary)',
+            color: isLanding ? 'rgba(255,255,255,0.45)' : 'var(--text-secondary)',
             textDecoration: 'none',
             fontWeight: 500,
             transition: 'color 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+          onMouseEnter={e => e.currentTarget.style.color = isLanding ? 'rgba(255,255,255,0.85)' : 'var(--text-primary)'}
+          onMouseLeave={e => e.currentTarget.style.color = isLanding ? 'rgba(255,255,255,0.45)' : 'var(--text-secondary)'}
           >
             {label}
           </Link>

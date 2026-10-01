@@ -255,7 +255,7 @@ export async function ensureFonts() {
 }
 
 // Renders one clip in real time. Resolves with { blob, mime, ext }.
-export async function renderClip({ src, clip, words, framing, options, onProgress, signal }) {
+export async function renderClip({ src, clip, words, framing, options, onProgress, onPausedChange, signal }) {
   await ensureFonts()
   const video = document.createElement('video')
   video.src = src
@@ -303,18 +303,34 @@ export async function renderClip({ src, clip, words, framing, options, onProgres
 
   const dur = clip.end - clip.start
   await new Promise((resolve, reject) => {
-    let raf // eslint-disable-line no-unused-vars
+    let raf = null
     const tick = () => {
-      if (signal?.aborted) { video.pause(); reject(new Error('CANCELLED')); return }
+      raf = null
+      if (signal?.aborted) { cleanup(); video.pause(); reject(new Error('CANCELLED')); return }
       const t = video.currentTime - clip.start
       drawFrame(ctx, video, { clip, groups, framing, options, t })
       onProgress?.(Math.min(1, t / dur))
-      if (video.currentTime >= clip.end || video.ended) { video.pause(); resolve(); return }
-      schedule()
+      if (video.currentTime >= clip.end || video.ended) { cleanup(); video.pause(); resolve(); return }
+      if (!document.hidden) raf = requestAnimationFrame(tick)
     }
-    // rAF stops in background tabs; fall back to timers so the export keeps going
-    const schedule = () => { if (document.hidden) setTimeout(tick, 33); else raf = requestAnimationFrame(tick) }
-    schedule()
+    // A hidden tab only gets ~1 timer tick per second, which records a ~1 fps
+    // clip. Pause the recording while hidden and pick up where it left off.
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf), raf = null
+        video.pause(); if (rec.state === 'recording') rec.pause()
+        onPausedChange?.(true)
+      } else {
+        onPausedChange?.(false)
+        if (rec.state === 'paused') rec.resume()
+        video.play().then(() => { if (!raf) raf = requestAnimationFrame(tick) }, () => {})
+      }
+    }
+    const onAbort = () => { if (document.hidden) tick() }
+    const cleanup = () => { document.removeEventListener('visibilitychange', onVisibility); signal?.removeEventListener('abort', onAbort) }
+    document.addEventListener('visibilitychange', onVisibility)
+    signal?.addEventListener('abort', onAbort)
+    if (document.hidden) onVisibility(); else raf = requestAnimationFrame(tick)
   })
 
   rec.stop()

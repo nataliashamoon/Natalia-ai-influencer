@@ -37,6 +37,7 @@ export function useClipActions({ project, clip, srcUrl, words, onChange }) {
   const setRenderMeta = m => { renderRef.current = m; setRenderMetaState(m) }
   const [rendering, setRendering] = useState(null)   // 0..1 while exporting
   const [dubbing, setDubbing] = useState(null)       // 0..1 while dubbing
+  const [paused, setPaused] = useState(false)        // export paused while the tab is hidden
   const [error, setError] = useState(null)
   const abortRef = useRef(null)
   const latest = useRef(clip)
@@ -66,7 +67,7 @@ export function useClipActions({ project, clip, srcUrl, words, onChange }) {
         const framing = await analyzeClipFraming(srcUrl, c).catch(() => null)
         if (framing) { c = { ...c, framing }; onChange(c) }
       }
-      const out = await renderClip({ src: srcUrl, clip: c, words, framing: c.framing, options: clipOptions(c), onProgress: setRendering, signal: ctrl.signal })
+      const out = await renderClip({ src: srcUrl, clip: c, words, framing: c.framing, options: clipOptions(c), onProgress: setRendering, onPausedChange: setPaused, signal: ctrl.signal })
       const key = `render_${project.id}_${c.id}_${Date.now()}`
       await putBlob(key, out.blob).catch(() => {})
       onChange({ ...latest.current, framing: c.framing, renderKey: key })
@@ -76,7 +77,7 @@ export function useClipActions({ project, clip, srcUrl, words, onChange }) {
     } catch (e) {
       if (e.message !== 'CANCELLED') setError(e.message)
       return null
-    } finally { setRendering(null); abortRef.current = null }
+    } finally { setRendering(null); setPaused(false); abortRef.current = null }
   }
 
   async function dub(lang) {
@@ -105,7 +106,7 @@ export function useClipActions({ project, clip, srcUrl, words, onChange }) {
   }
 
   return {
-    renderMeta, rendering, dubbing, error, setError, hf,
+    renderMeta, rendering, paused, dubbing, error, setError, hf,
     exportClip: () => ensureRender({ download: true }),
     ensureRender, dub, share,
     cancel: () => abortRef.current?.abort(),

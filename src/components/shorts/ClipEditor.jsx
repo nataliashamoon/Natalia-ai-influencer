@@ -15,7 +15,7 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
   const [framingProgress, setFramingProgress] = useState(0)
   const [dubLang, setDubLang] = useState('spa')
   const actions = useClipActions({ project, clip, srcUrl, words, onChange })
-  const { renderMeta, rendering, dubbing, error, setError } = actions
+  const { renderMeta, rendering, paused, dubbing, error, setError } = actions
 
   const options = clipOptions(clip)
   const setOpt = (k, v) => onChange({ ...clip, options: { ...(clip.options || {}), [k]: v }, renderKey: null })
@@ -127,7 +127,7 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
           <ErrorNote onClose={() => setError(null)}>{error}</ErrorNote>
           {rendering != null ? (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ flex: 1 }}><Progress value={rendering} label="Rendering your short" sub={`${Math.round(rendering * 100)}% · keep this tab open`} /></div>
+              <div style={{ flex: 1 }}><Progress value={rendering} label="Rendering your short" sub={paused ? 'Paused — come back to this tab to continue' : `${Math.round(rendering * 100)}% · keep this tab open`} /></div>
               <Btn size="sm" kind="ghost" onClick={actions.cancel}>Cancel</Btn>
             </div>
           ) : (

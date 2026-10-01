@@ -28,7 +28,7 @@ function PlatformRow({ label, text }) {
 // captions, and one-tap export / dub / post. Detailed edits open the full editor.
 export default function ClipCard({ index, clip, project, srcUrl, playing, onPlayingChange, onChange, onEdit, queued, onQueueDone }) {
   const actions = useClipActions({ project, clip, srcUrl, words: project.words, onChange })
-  const { rendering, dubbing, error, setError } = actions
+  const { rendering, paused, dubbing, error, setError } = actions
   const [dubOpen, setDubOpen] = useState(false)
   const [dubLang, setDubLang] = useState('spa')
   const [postNote, setPostNote] = useState(false)
@@ -85,7 +85,7 @@ export default function ClipCard({ index, clip, project, srcUrl, playing, onPlay
       <ErrorNote onClose={() => setError(null)}>{error}</ErrorNote>
       {rendering != null && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ flex: 1 }}><Progress value={rendering} label={queued ? 'Rendering for Download all…' : 'Rendering…'} sub={`${Math.round(rendering * 100)}% · keep this tab open`} /></div>
+          <div style={{ flex: 1 }}><Progress value={rendering} label={queued ? 'Rendering for Download all…' : 'Rendering…'} sub={paused ? 'Paused — come back to this tab to continue' : `${Math.round(rendering * 100)}% · keep this tab open`} /></div>
           <Btn size="sm" kind="ghost" onClick={actions.cancel}>Cancel</Btn>
         </div>
       )}

@@ -266,7 +266,7 @@ export async function initSession() {
     params: {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      clientInfo: { name: 'AI Influencer Studio', version: '1.0' },
+      clientInfo: { name: 'Lavi', version: '1.0' },
     },
   })
 }
@@ -1117,4 +1117,36 @@ export async function generatePosePreviews(influencer, onPoseComplete, { stance 
   } catch (e) {
     console.warn('[HF] generatePosePreviews failed:', e.message)
   }
+}
+
+// ── Low-level access for features that call other Higgsfield tools (Shorts Studio) ──
+export { callTool, unwrapMCP, extractJobIds, pollVideoJobs, uploadRefImage }
+
+// Upload a Blob/File and return both the Higgsfield media id and its CDN url.
+// Tools such as dubbing and video_analysis need the id, not the url.
+export async function uploadBlobForId(blob, { type = 'video', filename } = {}) {
+  const contentType = blob.type || (type === 'video' ? 'video/mp4' : type === 'audio' ? 'audio/mpeg' : 'image/jpeg')
+  const ext = contentType.includes('webm') ? 'webm' : contentType.includes('quicktime') ? 'mov'
+    : contentType.includes('png') ? 'png' : contentType.includes('jpeg') ? 'jpg'
+    : contentType.includes('wav') ? 'wav' : contentType.includes('audio') ? 'mp3' : 'mp4'
+  const name = filename || `lavi_${type}_${Date.now()}.${ext}`
+
+  const up = unwrapMCP(await callTool('media_upload', { method: 'upload_url', filename: name, content_type: contentType }))
+  const f0 = up?.uploads?.[0] ?? up?.files?.[0] ?? up?.data?.[0]
+  let uploadUrl = up?.upload_url || up?.url || f0?.upload_url || f0?.url
+  let mediaId = up?.media_id || up?.id || f0?.media_id || f0?.id
+  if (!uploadUrl || !mediaId) {
+    const text = typeof up === 'string' ? up : JSON.stringify(up ?? '')
+    mediaId = mediaId || (text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0]
+    uploadUrl = uploadUrl || (text.match(/https:\/\/[^\s"'\\]+/) || [])[0]
+  }
+  if (!uploadUrl || !mediaId) throw new Error('Higgsfield upload could not start')
+
+  const put = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } })
+  if (!put.ok) throw new Error(`Upload failed (${put.status})`)
+
+  const confirmed = unwrapMCP(await callTool('media_confirm', { media_id: mediaId, type }))
+  const text = typeof confirmed === 'string' ? confirmed : ''
+  const url = confirmed?.url || confirmed?.media_url || confirmed?.rawUrl || (text.match(/https:\/\/[^\s"'\\]+/) || [])[0] || null
+  return { id: confirmed?.media_id || mediaId, url }
 }

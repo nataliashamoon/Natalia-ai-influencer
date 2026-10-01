@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
       <p style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 40 }}>Last updated: June 8, 2026</p>
 
       <Section title="Overview">
-        Influencer Studio ("we", "us", or "our") is committed to protecting your privacy. This policy explains what information we collect, how we use it, and your rights regarding your data.
+        Lavi ("we", "us", or "our") is committed to protecting your privacy. This policy explains what information we collect, how we use it, and your rights regarding your data.
       </Section>
 
       <Section title="Information We Collect">
@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
       </Section>
 
       <Section title="Third-Party Services">
-        Influencer Studio uses the following third-party services:
+        Lavi uses the following third-party services:
         <ul style={{ marginTop: 8, paddingLeft: 20, lineHeight: 2 }}>
           <li><strong>Supabase</strong> — secure cloud database and authentication</li>
           <li><strong>Google OAuth</strong> — sign-in only; we do not access your Google data beyond your email and profile</li>

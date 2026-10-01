@@ -2,12 +2,12 @@ import { useState } from 'react'
 
 const FAQS = [
   {
-    q: 'What is Influencer Studio?',
-    a: 'Influencer Studio is a platform for designing and managing AI-generated influencers. You can create a character with a unique look, backstory, niche, and style, then generate photos and videos of them using AI.',
+    q: 'What is Lavi?',
+    a: 'Lavi is a platform for designing and managing AI-generated influencers. You can create a character with a unique look, backstory, niche, and style, then generate photos and videos of them using AI.',
   },
   {
     q: 'How do I generate photos and videos?',
-    a: 'Influencer Studio uses Higgsfield AI to generate images and videos. You need to connect your Higgsfield account under Settings → Connect Higgsfield. Once connected, you can generate content directly from each influencer\'s profile.',
+    a: 'Lavi uses Higgsfield AI to generate images and videos. You need to connect your Higgsfield account under Settings → Connect Higgsfield. Once connected, you can generate content directly from each influencer\'s profile.',
   },
   {
     q: 'Is my data private?',
@@ -19,7 +19,15 @@ const FAQS = [
   },
   {
     q: 'What AI models are used for generation?',
-    a: 'Influencer Studio supports several Higgsfield models including Soul 2, GPT Image 2, Nano Banana 2, and Seedance 2.0. Each model has different strengths — Soul 2 is great for consistent character photos, while Seedance excels at video.',
+    a: 'Lavi supports several Higgsfield models including Soul 2, GPT Image 2, Nano Banana 2, and Seedance 2.0. Each model has different strengths — Soul 2 is great for consistent character photos, while Seedance excels at video.',
+  },
+  {
+    q: 'What is Shorts Studio?',
+    a: 'Shorts Studio turns long videos into vertical clips for TikTok, Reels and YouTube Shorts. Upload a podcast, webinar or vlog and Lavi transcribes it, picks the most engaging moments, reframes them to 9:16 around the speaker, and adds captions and a hook. It also makes talking UGC ads with your creators and builds YouTube titles, chapters and thumbnails.',
+  },
+  {
+    q: 'Are my videos uploaded when I make clips?',
+    a: 'No. Transcription, face tracking and rendering run in your browser. A clip is only sent to Higgsfield if you choose to dub it.',
   },
   {
     q: 'Can I use AI-generated content commercially?',
@@ -34,7 +42,7 @@ const FAQS = [
     a: 'Your influencers are saved to your cloud account. Signing out on one device does not delete them — they will be waiting for you the next time you sign in.',
   },
   {
-    q: 'Is Influencer Studio free?',
+    q: 'Is Lavi free?',
     a: 'The app itself is free to use. Generating images and videos consumes Higgsfield credits, which are billed through your Higgsfield account.',
   },
   {
@@ -82,7 +90,7 @@ export default function FAQ() {
         FAQ
       </h1>
       <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginBottom: 40 }}>
-        Frequently asked questions about Influencer Studio.
+        Frequently asked questions about Lavi.
       </p>
       <div>
         {FAQS.map(item => <Item key={item.q} {...item} />)}

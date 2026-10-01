@@ -1,9 +1,13 @@
+import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { BRAND } from '../brand'
+import { supabaseEnabled } from '../utils/supabase'
 import { useTheme } from '../context/theme'
 import { useAuth } from '../context/auth'
 
 const links = [
   { to: '/influencers', label: 'Influencers' },
+  { to: '/shorts', label: 'Shorts' },
   { to: '/inspiration', label: 'Inspiration' },
   { to: '/brand-deals', label: 'Brand Deals' },
 ]
@@ -13,6 +17,8 @@ export default function Nav() {
   const { isDark, toggle } = useTheme()
   const { user, signInWithGoogle, signOut } = useAuth()
   const landing = pathname === '/'
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => { setMenuOpen(false) }, [pathname])
   const dark = isDark
 
   const navBg = isDark ? 'rgba(7,7,14,0.88)' : 'rgba(255,255,255,0.80)'
@@ -39,26 +45,23 @@ export default function Nav() {
       <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
         <span style={{
           width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-          border: dark ? '1px solid rgba(255,255,255,0.12)' : 'none',
+          background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+          border: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.35)',
           transition: 'background 0.5s',
         }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="5" r="3" fill="white" opacity="0.95"/>
-            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.95"/>
-          </svg>
+          <svg width="14" height="14" viewBox="0 0 64 64" fill="none"><path d="M22 15v30h20" stroke="white" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/><circle cx="45" cy="18" r="6" fill="#FFE14D"/></svg>
         </span>
         <span className="nav-brand-label" style={{
           fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',
           color: dark ? 'rgba(255,255,255,0.90)' : 'var(--text-primary)',
           transition: 'color 0.5s',
-        }}>Influencer Studio</span>
+        }}>{BRAND.name}</span>
       </NavLink>
 
       {/* Nav links */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         {links.map(l => (
           <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
             padding: '6px 14px',
@@ -80,6 +83,14 @@ export default function Nav() {
 
       {/* Right actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+        <button className="nav-menu-btn" aria-label="Menu" onClick={() => setMenuOpen(o => !o)} style={{
+          width: 38, height: 38, borderRadius: 10, border: 'none', background: menuOpen ? 'var(--bg-tertiary)' : 'transparent',
+          display: 'none', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)', cursor: 'pointer',
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            {menuOpen ? <><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></> : <><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></>}
+          </svg>
+        </button>
         <NavLink to="/create" style={({ isActive }) => ({
           padding: '7px 16px', borderRadius: 980,
           background: isActive ? (dark ? 'rgba(255,255,255,0.14)' : '#1D1D1F') : dark ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
@@ -135,7 +146,7 @@ export default function Nav() {
               : (user.email?.[0] ?? '?').toUpperCase()
             }
           </button>
-        ) : (
+        ) : supabaseEnabled && (
           <button
             onClick={signInWithGoogle}
             style={{
@@ -166,6 +177,20 @@ export default function Nav() {
           </svg>
         </NavLink>
       </div>
+      {menuOpen && (
+        <div className="nav-mobile-panel" style={{
+          position: 'absolute', top: 'var(--nav-h)', left: 0, right: 0, padding: '10px 14px 16px',
+          background: isDark ? 'rgba(7,7,14,0.97)' : 'rgba(255,255,255,0.97)', borderBottom: navBorder,
+          display: 'flex', flexDirection: 'column', gap: 2, boxShadow: 'var(--shadow-md)',
+        }}>
+          {links.map(l => (
+            <NavLink key={l.to} to={l.to} style={({ isActive }) => ({
+              padding: '12px 12px', borderRadius: 10, fontSize: 15, fontWeight: isActive ? 700 : 500, textDecoration: 'none',
+              color: isActive ? '#EC4899' : 'var(--text-primary)', background: isActive ? 'rgba(236,72,153,0.08)' : 'transparent',
+            })}>{l.label}</NavLink>
+          ))}
+        </div>
+      )}
     </nav>
   )
 }

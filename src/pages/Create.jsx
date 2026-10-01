@@ -28,6 +28,28 @@ const VIBE_OPTIONS = [
 ]
 const STEPS = ['Basics', 'References', 'Story', 'Look', 'Generate']
 
+// Quick-start templates — common creator types brands hire for. They only prefill;
+// every field stays editable.
+const TEMPLATES = [
+  { id: 'beauty', label: 'Skincare & beauty', icon: '🧴', patch: { gender: 'Female', age: '27', niches: ['Beauty', 'Wellness'], vibeWords: ['Clean Girl'], personality: 62, hairColor: 'brunette', hairLength: 'Long', hairTexture: 'Wavy', build: 'Slim',
+    backstory: 'Licensed esthetician turned creator. Known for honest, no-filter product reviews and simple 5-minute routines for busy mornings.', audience: 'Women 22–38 who want simple, effective skincare' } },
+  { id: 'fitness', label: 'Fitness coach', icon: '🏋️', patch: { gender: 'Female', age: '29', niches: ['Fitness', 'Wellness'], vibeWords: ['Sporty'], personality: 82, hairColor: 'blonde', hairLength: 'Long', hairTexture: 'Straight', build: 'Athletic',
+    backstory: 'Former college sprinter who now coaches busy people through 30-minute workouts. Upbeat, practical, allergic to fad diets.', audience: 'Beginners and busy professionals getting back into training' } },
+  { id: 'tech', label: 'Tech reviewer', icon: '🎧', patch: { gender: 'Male', age: '31', niches: ['Tech'], vibeWords: ['Tech Bro'], personality: 55, hairColor: 'black', hairLength: 'Short', hairTexture: 'Straight', build: 'Average',
+    backstory: 'Software engineer who tests every gadget on his desk for a month before reviewing it. Calm, specific, never hypes.', audience: 'Professionals and students upgrading their desk and audio setup' } },
+  { id: 'fashion', label: 'Fashion & lifestyle', icon: '👜', patch: { gender: 'Female', age: '24', niches: ['Fashion', 'Lifestyle'], vibeWords: ['Editorial'], personality: 74, hairColor: 'black', hairLength: 'Long', hairTexture: 'Straight', build: 'Tall',
+    backstory: 'Moved to the city for design school and never left. Mixes high and low pieces, shares outfit formulas and weekend city guides.', audience: 'Style-conscious women 18–30' } },
+  { id: 'food', label: 'Food & home', icon: '🍳', patch: { gender: 'Female', age: '33', niches: ['Food & Dining', 'Lifestyle'], vibeWords: ['Coastal'], personality: 66, hairColor: 'auburn', hairLength: 'Medium', hairTexture: 'Wavy', build: 'Average',
+    backstory: 'Home cook and new parent sharing weeknight recipes, kitchen finds and small rituals that make home feel calm.', audience: 'Parents and home cooks short on time' } },
+  { id: 'menswear', label: 'Menswear & grooming', icon: '🧔', patch: { gender: 'Male', age: '28', niches: ['Fashion', 'Lifestyle'], vibeWords: ['Old Money'], personality: 58, hairColor: 'brunette', hairLength: 'Short', hairTexture: 'Wavy', build: 'Athletic',
+    backstory: 'Ex-consultant who swapped decks for tailoring. Breaks down timeless outfits, grooming routines and buy-it-for-life pieces.', audience: 'Men 24–40 building a grown-up wardrobe' } },
+]
+const NAME_IDEAS = {
+  Female: ['Luna Rose', 'Mia Laurent', 'Ava Sinclair', 'Noor Haddad', 'Sofia Reyes', 'Jade Kim', 'Elena Brooks', 'Amara Cole', 'Isla Moreno', 'Priya Shah', 'Chloé Martin', 'Zara Ellis'],
+  Male: ['Leo Hart', 'Kai Morgan', 'Noah Bennett', 'Mateo Cruz', 'Ethan Park', 'Omar Vale', 'Julian Reed', 'Theo Grant', 'Arjun Mehta', 'Lucas Ford', 'Mason Lee', 'Elias Stone'],
+}
+const DRAFT_KEY = 'lavi_create_draft'
+
 const MODELS = [
   { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Native model for fashion and UGC.',          maxRefs: 1 },
   { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Highest quality output, maximum realism.',   maxRefs: 2 },
@@ -188,14 +210,14 @@ function FloatingCards() {
 }
 
 // ── Step indicator ────────────────────────────────────────────
-function StepIndicator({ current }) {
+function StepIndicator({ current, onJump }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 52 }}>
       {STEPS.map((label, i) => {
         const n = i + 1; const done = n < current; const active = n === current
         return (
           <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div onClick={() => done && onJump?.(n)} title={done ? `Back to ${label}` : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: done ? 'pointer' : 'default' }}>
               <div style={{
                 width: 30, height: 30, borderRadius: '50%', fontSize: 12, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -218,9 +240,30 @@ function StepIndicator({ current }) {
 }
 
 // ── Step 1: Basics ────────────────────────────────────────────
-function Step1({ data, set, onGenderChange, ageErrorPulse }) {
+function Step1({ data, set, onGenderChange, ageErrorPulse, onTemplate, onEnter }) {
+  function suggestName() {
+    const pool = NAME_IDEAS[data.gender] || [...NAME_IDEAS.Female, ...NAME_IDEAS.Male]
+    const options = pool.filter(n => n !== data.name)
+    set('name', options[Math.floor(Math.random() * options.length)])
+  }
   return (
     <div>
+      <div style={{ marginBottom: 30 }}>
+        <Lbl optional>Start from a template</Lbl>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {TEMPLATES.map(t => {
+            const on = data.template === t.id
+            return (
+              <button key={t.id} onClick={() => onTemplate(t)} style={{
+                padding: '8px 14px', borderRadius: 22, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                border: `1.5px solid ${on ? '#8B5CF6' : L.border}`, background: on ? 'rgba(139,92,246,0.09)' : L.surface,
+                color: on ? '#7C3AED' : L.text, transition: 'all 0.15s',
+              }}><span style={{ marginRight: 6 }}>{t.icon}</span>{t.label}</button>
+            )
+          })}
+        </div>
+      </div>
+
       <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: L.text, marginBottom: 8, lineHeight: 1.1 }}>Name your influencer</h2>
         <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Start with the basics — you can always refine later.</p>
@@ -228,7 +271,10 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
 
       <div style={{ marginBottom: 22 }}>
         <Lbl>Name</Lbl>
-        <input className={inputCls} style={inputStyle} value={data.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Luna Rose" autoFocus />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input className={inputCls} style={inputStyle} value={data.name} onChange={e => set('name', e.target.value)} onKeyDown={e => { if (e.key === 'Enter') onEnter?.() }} placeholder="e.g. Luna Rose" autoFocus />
+          <button onClick={suggestName} title="Suggest a name" style={{ flexShrink: 0, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${L.border}`, background: L.surface, color: L.textSub, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Suggest</button>
+        </div>
       </div>
 
       <div style={{ marginBottom: 22 }}>
@@ -459,6 +505,12 @@ function Step3({ data, set }) {
           rows={5}
           style={{ ...taStyle, background: L.surfaceAlt, marginBottom: 0 }}
         />
+      </div>
+
+      <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
+        <Lbl optional>Brand fit</Lbl>
+        <input className={inputCls} value={data.dreamBrands || ''} onChange={e => set('dreamBrands', e.target.value)} placeholder="Brands or products they'll promote, e.g. Glossier, your own store" style={{ ...inputStyle, marginBottom: 10 }} />
+        <input className={inputCls} value={data.audience || ''} onChange={e => set('audience', e.target.value)} placeholder="Who should they win over? e.g. women 25–40 into wellness" style={inputStyle} />
       </div>
 
       <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card }}>
@@ -1564,11 +1616,34 @@ export default function Create() {
     faceRefNote: '', styleRefNote: '',
   })
 
+  // Draft autosave — refreshing or wandering off no longer loses the wizard
+  const [draft, setDraft] = useState(() => {
+    if (prefill.prefillName || prefill.replaceId) return null
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return d?.data?.name || d?.step > 1 ? d : null } catch { return null }
+  })
+  useEffect(() => {
+    if (draft) return // don't overwrite the saved draft until the user decides
+    const dirty = data.name || data.gender || data.backstory || data.template
+    if (!dirty) return
+    const t = setTimeout(() => {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: Math.min(step, 4), data, at: Date.now() })) }
+      catch { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: Math.min(step, 4), data: { ...data, faceRef: null, styleRef: null }, at: Date.now() })) } catch {} }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [data, step, draft])
+  function resumeDraft() { setData(d => ({ ...d, ...draft.data })); setStep(draft.step || 1); setDraft(null) }
+  function discardDraft() { try { localStorage.removeItem(DRAFT_KEY) } catch {} setDraft(null) }
+
+  function applyTemplate(t) {
+    setDraft(null)
+    setData(prev => ({ ...prev, ...t.patch, template: t.id, name: prev.name }))
+  }
+
   const [shakeContinue, setShakeContinue] = useState(false)
   const [ageErrorPulse, setAgeErrorPulse] = useState(false)
   const [hfConnected, setHfConnected] = useState(isHFConnected)
 
-  function set(k, v) { setData(prev => ({ ...prev, [k]: v })) }
+  function set(k, v) { setDraft(null); setData(prev => ({ ...prev, [k]: v })) }
 
   const FEMALE_ONLY_VIBES = ['Clean Girl', 'Cottagecore']
   const MALE_ONLY_VIBES = ['Tech Bro']
@@ -1608,6 +1683,7 @@ export default function Create() {
   }
 
   function resetAll() {
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
     setStep(1)
     setData({ name: '', gender: '', age: '', niches: [], nicheCustom: '', backstory: '', personality: 50, ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight', eyeColor: '', build: '', uniqueFeatures: '', vibeWords: [], faceRef: null, styleRef: null, faceRefNote: '', styleRefNote: '' })
   }
@@ -1632,10 +1708,10 @@ export default function Create() {
         characterSheetImage: null,
         closeUpImage1: null,
         closeUpImage2: null,
-        audience: '',
+        audience: data.audience || '',
         clothingStyle: (data.vibeWords || []).join(', '),
         hobbies: data.hobbies || '', location: data.location || '',
-        palette: [], voice: '', dreamBrands: '', contentPillars: [],
+        palette: [], voice: '', dreamBrands: data.dreamBrands || '', contentPillars: [],
         videoUrls: [], scripts: [], homeImages: [],
         wardrobeSlots: [
           { id: generateId(), name: 'Wardrobe 1', image: null },
@@ -1666,6 +1742,7 @@ export default function Create() {
         personality: data.personality,
         backstory: data.backstory || '',
       })
+      try { localStorage.removeItem(DRAFT_KEY) } catch {}
       flushSync(() => {
         if (replaceId) {
           setInfluencers(prev => prev.map(inf => inf.id === replaceId ? { ...inf, ...newInf } : inf))
@@ -1697,7 +1774,18 @@ export default function Create() {
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 42%, transparent 28%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
       <div style={{ width: '100%', maxWidth: 548, padding: '40px 24px 100px', position: 'relative', zIndex: 2 }}>
-        <StepIndicator current={step} />
+        <StepIndicator current={step} onJump={n => setStep(n)} />
+
+        {draft && step === 1 && (
+          <div style={{ marginBottom: 28, padding: '14px 16px', borderRadius: 14, border: '1.5px solid rgba(139,92,246,0.35)', background: 'rgba(139,92,246,0.06)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 200, fontSize: 13.5, color: L.text }}>
+              <b>Pick up where you left off?</b><br />
+              <span style={{ color: L.textSub }}>{draft.data?.name ? `${draft.data.name} — ` : ''}step {draft.step} of {STEPS.length}</span>
+            </span>
+            <button onClick={discardDraft} style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${L.border}`, background: L.surface, color: L.textSub, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Start fresh</button>
+            <button onClick={resumeDraft} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Resume draft</button>
+          </div>
+        )}
 
         {!hfConnected && step < 5 && (
           <div style={{
@@ -1762,7 +1850,7 @@ export default function Create() {
           </div>
         )}
 
-        {step === 1 && <Step1 data={data} set={set} onGenderChange={handleGenderChange} ageErrorPulse={ageErrorPulse} />}
+        {step === 1 && <Step1 data={data} set={set} onGenderChange={handleGenderChange} ageErrorPulse={ageErrorPulse} onTemplate={applyTemplate} onEnter={() => canAdvance() && handleContinue()} />}
         {step === 2 && <Step2 data={data} set={set} />}
         {step === 3 && <Step3 data={data} set={set} />}
         {step === 4 && <Step4 data={data} set={set} />}

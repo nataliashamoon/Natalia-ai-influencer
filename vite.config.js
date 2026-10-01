@@ -100,8 +100,28 @@ const claudePlugin = {
   },
 }
 
+// Local dev product-page reader — runs api/product.js through a tiny res shim
+const productPlugin = {
+  name: 'product-proxy',
+  configureServer(server) {
+    server.middlewares.use('/api/product', async (req, res) => {
+      const { default: handler } = await server.ssrLoadModule('/api/product.js')
+      const query = Object.fromEntries(new URLSearchParams(req.url.split('?')[1] || ''))
+      const shim = {
+        statusCode: 200,
+        setHeader: (k, v) => res.setHeader(k, v),
+        status(code) { this.statusCode = code; return this },
+        json(obj) { res.writeHead(this.statusCode, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) },
+        end() { res.writeHead(this.statusCode); res.end() },
+      }
+      await handler({ method: req.method, headers: req.headers, url: req.url, query }, shim)
+    })
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin],
+  plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin, productPlugin],
+  worker: { format: 'es' },
   server: {
     proxy: {
       '/api/hf': {

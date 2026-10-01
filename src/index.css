@@ -185,8 +185,23 @@ a {
 }
 
 /* ── Nav mobile ── */
+@media (max-width: 760px) {
+  .nav-links { display: none !important; }
+  .nav-menu-btn { display: flex !important; }
+}
 @media (max-width: 640px) {
   .nav-root { padding: 0 12px !important; gap: 2px !important; }
   .nav-link  { padding: 5px 8px !important; font-size: 12px !important; }
-  .nav-brand-label { display: none !important; }
+  .nav-brand-label { font-size: 14px !important; }
 }
+
+/* ── Shorts Studio ── */
+@keyframes lavi-indet { 0% { left: -35%; } 100% { left: 100%; } }
+@media (max-width: 960px) {
+  .lavi-editor, .lavi-clips, .lavi-new, .lavi-yt, .lavi-ugc { grid-template-columns: 1fr !important; }
+  .lavi-editor > div:first-child { position: static !important; max-width: 340px; margin: 0 auto; width: 100%; }
+}
+@media (max-width: 720px) {
+  .lavi-tabs { grid-template-columns: 1fr !important; }
+}
+input[type=range] { accent-color: #8B5CF6; }

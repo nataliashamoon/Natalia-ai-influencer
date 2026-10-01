@@ -21,7 +21,7 @@ export default function Footer() {
       marginTop: 'auto',
     }}>
       <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: 500 }}>
-        © {new Date().getFullYear()} Influencer Studio
+        © {new Date().getFullYear()} Lavi
       </span>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>

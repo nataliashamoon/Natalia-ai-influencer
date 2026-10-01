@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider, useTheme } from './context/theme'
@@ -12,6 +12,7 @@ import Inspiration from './pages/Inspiration'
 import BrandDeals from './pages/BrandDeals'
 import Create from './pages/Create'
 import Settings from './pages/Settings'
+const Shorts = lazy(() => import('./pages/Shorts'))
 import AuthCallback from './pages/AuthCallback'
 import FAQ from './pages/FAQ'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/brand-deals" element={<BrandDeals />} />
         <Route path="/create" element={<Create />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/shorts" element={<Suspense fallback={<div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh' }} />}><Shorts /></Suspense>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />

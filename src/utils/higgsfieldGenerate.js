@@ -266,7 +266,7 @@ export async function initSession() {
     params: {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      clientInfo: { name: 'AI Influencer Studio', version: '1.0' },
+      clientInfo: { name: 'Lavi', version: '1.0' },
     },
   })
 }
@@ -291,6 +291,10 @@ function unwrapMCP(result) {
   return result
 }
 
+function isHFErrorText(s) {
+  return /something went wrong|internal server error|^\s*"?error\b/i.test(String(s ?? ''))
+}
+
 function extractJobIds(result) {
   const data = unwrapMCP(result)
 
@@ -304,8 +308,10 @@ function extractJobIds(result) {
     if (typeof data.id === 'string' && data.id.length >= 8) return [data.id]
   }
 
-  // Plain-text response: extract UUIDs embedded in the description
-  const str = typeof data === 'string' ? data : JSON.stringify(data ?? '')
+  // Plain-text response: extract UUIDs embedded in the description. Error replies
+  // ("Something went wrong… Request ID: <uuid>") carry a request id, not a job id.
+  const str = (typeof data === 'string' ? data : JSON.stringify(data ?? '')).replace(/request[ _-]?id\W*[0-9a-f-]{36}/gi, '')
+  if (isHFErrorText(str)) return []
   const uuids = str.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []
   hflog('[HF] extracted UUIDs from text:', uuids)
   return [...new Set(uuids)]
@@ -351,6 +357,8 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
   const urls = []
   const shareUrls = []
   const softRetries = new Map() // jobId → count of rounds seen as soft-terminal with no URL
+  const errorRounds = new Map() // jobId → consecutive rounds where job_status answered with an error
+  let lastError = null
 
   for (let round = 0; round < 270; round++) { // 270 × 2s = 9 minutes max
     if (isCancelled?.()) throw new Error('CANCELLED')
@@ -371,7 +379,21 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
           || extractVideoUrls(result)[0] || null
         const shareUrl = resultsObj?.shareUrl || resultsObj?.share_url || item?.shareUrl || item?.share_url
           || extractShareUrls(result)[0] || null
-        const status = (item?.status || data?.status || '').toLowerCase()
+        // job_status can also answer in plain text: "Job <id> — waiting" / "… — failed"
+        const textStatus = typeof data === 'string' ? (data.match(/—\s*([a-z_]+)/i) || [])[1] : ''
+        const status = (item?.status || data?.status || textStatus || '').toLowerCase()
+
+        if (!url && typeof data === 'string' && isHFErrorText(data)) {
+          const n = (errorRounds.get(jobId) || 0) + 1
+          errorRounds.set(jobId, n)
+          if (n >= 5) {
+            pending.delete(jobId)
+            lastError = data.split('\n')[0]
+            console.warn('[HF-VID] job', jobId.slice(0, 8), 'status keeps erroring:', lastError)
+          }
+          continue
+        }
+        errorRounds.delete(jobId)
 
         if (url) {
           pending.delete(jobId)
@@ -384,6 +406,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
           }
         } else if (VIDEO_FAIL_TERMINAL.has(status)) {
           pending.delete(jobId)
+          lastError = `the job ${status === 'failed' ? 'failed' : `ended as "${status}"`}`
           console.warn('[HF-VID] job', jobId.slice(0, 8), 'failed, status:', status)
         } else if (VIDEO_SOFT_TERMINAL.has(status)) {
           // Job says completed but no URL yet — CDN propagation lag or format mismatch.
@@ -412,7 +435,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
     onProgress?.(100)
     return { urls: urls.slice(0, total), shareUrls: shareUrls.slice(0, total) }
   }
-  if (pending.size === 0) throw new Error('Video generation failed — all jobs ended without output')
+  if (pending.size === 0) throw new Error(lastError ? `Higgsfield: ${lastError}` : 'Video generation failed — all jobs ended without output')
   throw new Error('Video generation timed out — check Higgsfield dashboard')
 }
 
@@ -1117,4 +1140,36 @@ export async function generatePosePreviews(influencer, onPoseComplete, { stance 
   } catch (e) {
     console.warn('[HF] generatePosePreviews failed:', e.message)
   }
+}
+
+// ── Low-level access for features that call other Higgsfield tools (Shorts Studio) ──
+export { callTool, unwrapMCP, extractJobIds, isHFErrorText, pollVideoJobs, uploadRefImage }
+
+// Upload a Blob/File and return both the Higgsfield media id and its CDN url.
+// Tools such as dubbing and video_analysis need the id, not the url.
+export async function uploadBlobForId(blob, { type = 'video', filename } = {}) {
+  const contentType = blob.type || (type === 'video' ? 'video/mp4' : type === 'audio' ? 'audio/mpeg' : 'image/jpeg')
+  const ext = contentType.includes('webm') ? 'webm' : contentType.includes('quicktime') ? 'mov'
+    : contentType.includes('png') ? 'png' : contentType.includes('jpeg') ? 'jpg'
+    : contentType.includes('wav') ? 'wav' : contentType.includes('audio') ? 'mp3' : 'mp4'
+  const name = filename || `lavi_${type}_${Date.now()}.${ext}`
+
+  const up = unwrapMCP(await callTool('media_upload', { method: 'upload_url', filename: name, content_type: contentType }))
+  const f0 = up?.uploads?.[0] ?? up?.files?.[0] ?? up?.data?.[0]
+  let uploadUrl = up?.upload_url || up?.url || f0?.upload_url || f0?.url
+  let mediaId = up?.media_id || up?.id || f0?.media_id || f0?.id
+  if (!uploadUrl || !mediaId) {
+    const text = typeof up === 'string' ? up : JSON.stringify(up ?? '')
+    mediaId = mediaId || (text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0]
+    uploadUrl = uploadUrl || (text.match(/https:\/\/[^\s"'\\]+/) || [])[0]
+  }
+  if (!uploadUrl || !mediaId) throw new Error('Higgsfield upload could not start')
+
+  const put = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } })
+  if (!put.ok) throw new Error(`Upload failed (${put.status})`)
+
+  const confirmed = unwrapMCP(await callTool('media_confirm', { media_id: mediaId, type }))
+  const text = typeof confirmed === 'string' ? confirmed : ''
+  const url = confirmed?.url || confirmed?.media_url || confirmed?.rawUrl || (text.match(/https:\/\/[^\s"'\\]+/) || [])[0] || null
+  return { id: confirmed?.media_id || mediaId, url }
 }

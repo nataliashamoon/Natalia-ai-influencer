@@ -50,10 +50,13 @@ export default async function handler(req) {
     })
   }
 
-  // Forward all request headers, drop 'host' so upstream doesn't reject it
+  // Forward the request headers except browser-only ones. Higgsfield rejects any
+  // browser Origin ("Forbidden origin"), and this is a server-to-server call, so
+  // origin/referer/cookies never belong upstream. 'host' would be wrong too.
+  const DROP = new Set(['host', 'origin', 'referer', 'cookie'])
   const forward = new Headers()
   for (const [k, v] of req.headers.entries()) {
-    if (k === 'host') continue
+    if (DROP.has(k) || k.startsWith('sec-fetch-') || k.startsWith('x-vercel-')) continue
     forward.set(k, v)
   }
 

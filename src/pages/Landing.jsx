@@ -1,251 +1,260 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useTheme } from '../context/theme'
+import { useNavigate, Link } from 'react-router-dom'
+import { BRAND } from '../brand'
 
-const WORDS = ['Influencer', 'Creator', 'Avatar', 'Celebrity']
-const TYPE_SPEED = 75
-const DELETE_SPEED = 45
-const PAUSE_MS = 1800
+// The landing page speaks in the product's own visual language: vertical phone
+// frames with burned-in, word-by-word captions — exactly what Lavi exports.
 
-function useTypewriter() {
-  const [text, setText] = useState('')
-  const [wordIdx, setWordIdx] = useState(0)
-  const [phase, setPhase] = useState('typing')
+const PHONES = [
+  { img: '/landing/i32.webp', hook: 'POV: your creator never cancels', words: ['She', 'posts', 'every', 'single', 'day', 'and', 'never', 'misses', 'a', 'brief'], tilt: -7, x: 0, y: 36, z: 1 },
+  { img: '/landing/i5.webp', hook: 'I did not expect this to work', words: ['Okay', 'this', 'serum', 'actually', 'changed', 'my', 'morning', 'routine'], tilt: 0, x: 1, y: 0, z: 3, main: true },
+  { img: '/landing/i44.webp', hook: 'Honest review, 30 days in', words: ['Noise', 'cancelling', 'that', 'actually', 'cancels', 'noise', 'finally'], tilt: 7, x: 2, y: 36, z: 2 },
+]
 
+function useTicker(len, ms = 420) {
+  const [i, setI] = useState(0)
   useEffect(() => {
-    const word = WORDS[wordIdx]
-    if (phase === 'typing') {
-      if (text.length < word.length) {
-        const t = setTimeout(() => setText(word.slice(0, text.length + 1)), TYPE_SPEED)
-        return () => clearTimeout(t)
-      } else {
-        const t = setTimeout(() => setPhase('deleting'), PAUSE_MS)
-        return () => clearTimeout(t)
-      }
-    }
-    if (phase === 'deleting') {
-      if (text.length > 0) {
-        const t = setTimeout(() => setText(text.slice(0, -1)), DELETE_SPEED)
-        return () => clearTimeout(t)
-      } else {
-        setWordIdx(i => (i + 1) % WORDS.length)
-        setPhase('typing')
-      }
-    }
-  }, [text, phase, wordIdx])
-
-  return text
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const t = setInterval(() => setI(v => (v + 1) % (len + 4)), ms)
+    return () => clearInterval(t)
+  }, [len, ms])
+  return i
 }
 
-// All available images — add more paths here as you collect them
-const ALL_IMGS = [
-  '/inf/i1.png',  '/inf/i2.png',  '/inf/i3.jpg',  '/inf/i4.jpg',  '/inf/i5.png',
-  '/inf/i6.jpg',  '/inf/i7.png',  '/inf/i8.png',  '/inf/i9.png',  '/inf/i10.png',
-  '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png',
-  '/inf/i16.png', '/inf/i17.png', '/inf/i18.png', '/inf/i19.png', '/inf/i20.png',
-  '/inf/i21.png', '/inf/i22.png', '/inf/i23.png', '/inf/i24.png', '/inf/i25.png',
-  '/inf/i26.png', '/inf/i27.png', '/inf/i28.png', '/inf/i29.png',
-  '/inf/i30.png', '/inf/i31.png', '/inf/i32.png', '/inf/i33.png', '/inf/i34.png',
-  '/inf/i35.png', '/inf/i36.png', '/inf/i37.png', '/inf/i38.png', '/inf/i39.png',
-  '/inf/i40.png', '/inf/i41.png',
-  '/inf/i42.png', '/inf/i43.png', '/inf/i44.png', '/inf/i45.png', '/inf/i46.png',
-]
+function Phone({ p, size = 'md', live = true, side = '' }) {
+  const tick = useTicker(p.words.length, p.main ? 380 : 470)
+  const idx = live ? Math.min(tick, p.words.length - 1) : 2
+  const group = Math.floor(idx / 3) * 3
+  const shown = p.words.slice(group, group + 3)
+  const progress = live ? Math.min(1, tick / (p.words.length + 3)) : 0.4
+  return (
+    <div className={`lv-phone lv-phone-${size} ${side ? 'lv-side-' + side : ''}`}>
+      <img src={p.img} alt="" loading={p.main ? 'eager' : 'lazy'} />
+      <div className="lv-hook">{p.hook}</div>
+      <div className="lv-cap">
+        {shown.map((w, i) => <span key={group + i} className={group + i === idx ? 'on' : ''}>{w}</span>)}
+      </div>
+      <div className="lv-bar"><i style={{ width: `${progress * 100}%` }} /></div>
+    </div>
+  )
+}
 
-// 6 card slots — position, rotation, size, float timing
-const CARDS = [
-  { left: '-28px', top: '6%',  w: 158, rot: '-9deg',  opacity: 0.50, period: 8,  sway: 11, delay: 0.0 },
-  { left:  '28px', top: '43%', w: 138, rot:  '5deg',  opacity: 0.38, period: 10, sway: 14, delay: 1.6 },
-  { left: '-14px', top: '74%', w: 146, rot: '-5deg',  opacity: 0.42, period: 12, sway: 16, delay: 0.8 },
-  { right: '-28px',top: '4%',  w: 160, rot:  '10deg', opacity: 0.50, period: 9,  sway: 13, delay: 0.4 },
-  { right:  '24px',top: '42%', w: 140, rot: '-7deg',  opacity: 0.38, period: 11, sway: 15, delay: 2.0 },
-  { right: '-16px',top: '72%', w: 148, rot:  '6deg',  opacity: 0.44, period: 13, sway: 17, delay: 1.2 },
-]
+function Check({ children }) {
+  return (
+    <li>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+      <span>{children}</span>
+    </li>
+  )
+}
 
 export default function Landing() {
   const navigate = useNavigate()
-  const { isDark } = useTheme()
-  const animatedWord = useTypewriter()
-
-  // Per-card: which image src + whether currently fading out
-  const [cardSrcs, setCardSrcs] = useState(() => ALL_IMGS.slice(0, CARDS.length))
-  const [cardFade, setCardFade] = useState(() => CARDS.map(() => false))
-
-  // Rotate cards: every ~3s pick one random slot, crossfade to a different image
-  useEffect(() => {
-    let alive = true
-
-    function tick() {
-      if (!alive) return
-      const i = Math.floor(Math.random() * CARDS.length)
-      // Fade out
-      setCardFade(prev => { const n = [...prev]; n[i] = true; return n })
-      setTimeout(() => {
-        if (!alive) return
-        // Swap image while invisible
-        setCardSrcs(prev => {
-          const options = ALL_IMGS.filter(s => s !== prev[i])
-          const next = [...prev]
-          next[i] = options[Math.floor(Math.random() * options.length)]
-          return next
-        })
-        // Fade back in
-        setCardFade(prev => { const n = [...prev]; n[i] = false; return n })
-      }, 750)
-    }
-
-    const id = setInterval(tick, 2800)
-    return () => { alive = false; clearInterval(id) }
-  }, [])
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: isDark ? '#07070E' : '#FFFFFF',
-      overflow: 'hidden',
-      padding: 'calc(var(--nav-h) + 40px) 24px 80px',
-      textAlign: 'center',
-    }}>
-
-      {/* Orbs */}
-      <div style={{ position:'absolute', width:760, height:760, top:'-22%', left:'-18%', borderRadius:'50%', background:`radial-gradient(circle, rgba(236,72,153,${isDark?'0.28':'0.18'}) 0%, transparent 65%)`, animation:'orb1 14s ease-in-out infinite', pointerEvents:'none' }}/>
-      <div style={{ position:'absolute', width:620, height:620, top:'-14%', right:'-12%', borderRadius:'50%', background:`radial-gradient(circle, rgba(0,113,227,${isDark?'0.22':'0.14'}) 0%, transparent 65%)`, animation:'orb2 19s ease-in-out infinite', pointerEvents:'none' }}/>
-      <div style={{ position:'absolute', width:820, height:820, bottom:'-32%', left:'18%', borderRadius:'50%', background:`radial-gradient(circle, rgba(139,92,246,${isDark?'0.18':'0.13'}) 0%, transparent 65%)`, animation:'orb3 23s ease-in-out infinite', pointerEvents:'none' }}/>
-
-      {/* Dot grid */}
-      <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.07)'} 1px, transparent 1px)`, backgroundSize:'32px 32px', pointerEvents:'none' }}/>
-
-      {/* ── Floating influencer cards ── */}
-      {CARDS.map((card, i) => {
-        const pos = {}
-        if (card.left  !== undefined) pos.left  = card.left
-        if (card.right !== undefined) pos.right = card.right
-        return (
-          <div
-            key={i}
-            className="landing-card"
-            style={{
-              position: 'absolute',
-              top: card.top,
-              ...pos,
-              width: card.w,
-              transform: `rotate(${card.rot})`,
-              opacity: 0,
-              // --target-opacity on the outer div so cardAppear animation can read it
-              '--target-opacity': card.opacity,
-              animation: `cardAppear 1s ease ${card.delay + 0.2}s forwards`,
-              pointerEvents: 'none',
-              zIndex: 0,
-            }}
-          >
-            {/* Inner: float + sway + crossfade opacity */}
-            <div style={{
-              animation: `cardFloat ${card.period}s ease-in-out ${card.delay}s infinite, cardSway ${card.sway}s ease-in-out ${card.delay * 0.7}s infinite`,
-              borderRadius: 18,
-              overflow: 'hidden',
-              boxShadow: isDark ? '0 28px 70px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.09)' : '0 28px 70px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.07)',
-              opacity: cardFade[i] ? 0 : 1,
-              transition: 'opacity 0.75s ease',
-            }}>
-              <img
-                src={cardSrcs[i]}
-                alt=""
-                style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }}
-              />
-              <div style={{ position:'absolute', inset:0, background:`linear-gradient(to top, rgba(0,0,0,${isDark?'0.45':'0.25'}) 0%, transparent 55%)` }}/>
-            </div>
+    <div className="lv">
+      {/* Hero */}
+      <section className="lv-hero">
+        <div className="lv-hero-copy">
+          <h1>Your brand’s own creators, posting every day.</h1>
+          <p className="lv-lede">
+            {BRAND.name} designs AI influencers that look, dress and speak on-brand — then turns them, and your long videos, into photos, UGC ads and captioned shorts. No casting, no shoots, no waiting on deliverables.
+          </p>
+          <div className="lv-ctas">
+            <button className="lv-btn lv-btn-primary" onClick={() => navigate('/create')}>Create a creator</button>
+            <button className="lv-btn lv-btn-quiet" onClick={() => navigate('/shorts')}>Clip a long video</button>
           </div>
-        )
-      })}
-
-      {/* Vignette */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: isDark ? 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.82) 100%)' : 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(255,255,255,0.88) 100%)',
-        pointerEvents: 'none', zIndex: 1,
-      }}/>
-
-      {/* ── Center content ── */}
-      <div style={{ maxWidth: 680, position: 'relative', zIndex: 2 }}>
-
-
-        <h1 style={{ fontSize:'clamp(62px,10vw,104px)', fontWeight:800, letterSpacing:'-3.5px', lineHeight:1.0, color: isDark ? '#fff' : '#1D1D1F', marginBottom:2 }}>
-          Create Your
-        </h1>
-
-        <div style={{
-          fontSize: 'clamp(62px,10vw,104px)', fontWeight:800, letterSpacing:'-3.5px', lineHeight:1.1,
-          minHeight: '1.15em', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:36,
-        }}>
-          <span style={{ background:'linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #60A5FA 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
-            {animatedWord}
-          </span>
-          <span style={{ display:'inline-block', width:5, height:'0.72em', background:'linear-gradient(to bottom, #EC4899, #A855F7)', marginLeft:6, borderRadius:3, animation:'blink 1s step-end infinite', verticalAlign:'middle', flexShrink:0 }}/>
+          <p className="lv-fine">Free and open source. Runs on your own Higgsfield account.</p>
         </div>
+        <div className="lv-hero-stage" aria-hidden="true">
+          {PHONES.map((p, i) => (
+            <div key={i} className="lv-slot" style={{ '--tilt': `${p.tilt}deg`, '--x': p.x, '--y': `${p.y}px`, zIndex: p.z }}>
+              <Phone p={p} size={p.main ? 'lg' : 'md'} side={p.x === 0 ? 'left' : p.x === 2 ? 'right' : ''} />
+            </div>
+          ))}
+        </div>
+      </section>
 
-        <p style={{ fontSize:20, color: isDark ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.42)', lineHeight:1.65, margin:'0 auto 52px', maxWidth:420, fontWeight:400, letterSpacing:'-0.1px' }}>
-          Build, manage, and grow your AI influencers.
-        </p>
+      <p className="lv-for">For social managers, influencer marketers, DTC brands, agencies and founders who need creator content without a creator budget.</p>
 
-        <button
-          onClick={() => navigate('/create')}
-          style={{
-            padding:'17px 60px', borderRadius:980,
-            background:'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
-            color:'#fff', fontSize:17, fontWeight:700, letterSpacing:'-0.2px',
-            boxShadow:'0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)',
-            transition:'transform 0.18s, box-shadow 0.18s',
-            border: 'none', cursor: 'pointer',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform='scale(1.04) translateY(-2px)'; e.currentTarget.style.boxShadow='0 0 60px rgba(168,85,247,0.65), 0 8px 32px rgba(0,0,0,0.5)' }}
-          onMouseLeave={e => { e.currentTarget.style.transform='scale(1) translateY(0)'; e.currentTarget.style.boxShadow='0 0 32px rgba(168,85,247,0.45), 0 4px 20px rgba(0,0,0,0.5)' }}
-        >
-          Get Started →
-        </button>
-      </div>
+      {/* Creators */}
+      <section className="lv-row">
+        <div className="lv-row-visual lv-mosaic" aria-hidden="true">
+          {['i26', 'i43', 'i11', 'i29'].map((n, i) => <img key={n} src={`/landing/${n}.webp`} alt="" loading="lazy" className={`m${i}`} />)}
+        </div>
+        <div className="lv-row-copy">
+          <h2>Design a creator once. Use them in every campaign.</h2>
+          <p>Pick a face, a niche, a wardrobe and a voice. Your creator stays recognisably the same person across every shoot, outfit and city.</p>
+          <ul className="lv-list">
+            <Check>Photo studio for lifestyle, product and brand-deal shots</Check>
+            <Check>Wardrobe library and locations that match your brand</Check>
+            <Check>Video studio for talking, walking and product moments</Check>
+          </ul>
+          <Link to="/create" className="lv-link">Start the creator wizard</Link>
+        </div>
+      </section>
+
+      {/* Shorts */}
+      <section className="lv-row lv-row-flip">
+        <div className="lv-row-visual lv-reframe" aria-hidden="true">
+          <div className="lv-wide">
+            <img src="/landing/i3.webp" alt="" loading="lazy" />
+            <img src="/landing/i6.webp" alt="" loading="lazy" />
+            <span className="lv-wide-tag">1:12:40 podcast</span>
+          </div>
+          <svg className="lv-arrow" width="56" height="24" viewBox="0 0 56 24" fill="none"><path d="M2 12h48m0 0-8-8m8 8-8 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <Phone p={{ img: '/landing/i6.webp', hook: 'The mistake that cost us a year', words: ['We', 'quit', 'right', 'before', 'it', 'started', 'working'] }} size="sm" />
+        </div>
+        <div className="lv-row-copy">
+          <h2>One long video in. A week of shorts out.</h2>
+          <p>Drop in a podcast, webinar or livestream. {BRAND.name} transcribes it, finds the moments most likely to travel, and cuts them into vertical clips ready for TikTok, Reels and Shorts.</p>
+          <ul className="lv-list">
+            <Check>AI picks 3–15 moments and scores each one</Check>
+            <Check>Smart 9:16 framing follows the speaker, or splits two</Check>
+            <Check>Word-by-word captions, hook text, color grades and zooms</Check>
+            <Check>Dub into 18 languages, plus titles, chapters and thumbnails for YouTube</Check>
+          </ul>
+          <Link to="/shorts" className="lv-link">Open Shorts Studio</Link>
+        </div>
+      </section>
+
+      {/* UGC */}
+      <section className="lv-row">
+        <div className="lv-row-visual lv-ugc" aria-hidden="true">
+          <div className="lv-script">
+            <b>Script · honest review</b>
+            “Okay, I need to tell you about this serum. I’ve used it every morning for two weeks and my skin has never looked this calm.”
+          </div>
+          <Phone p={{ img: '/landing/i5.webp', hook: 'Two weeks in, honest review', words: ['My', 'skin', 'has', 'never', 'looked', 'this', 'calm'] }} size="sm" />
+        </div>
+        <div className="lv-row-copy">
+          <h2>UGC ads, minus the UGC creators.</h2>
+          <p>Paste a product link. Claude writes three angles, you pick one, and your creator says it to camera — lip-synced, with natural voice, in about two minutes.</p>
+          <ul className="lv-list">
+            <Check>Use any {BRAND.name} creator, or upload a photo of a real one</Check>
+            <Check>Hold-the-product shots that keep your packaging exact</Check>
+            <Check>8 to 30 seconds, vertical, ready to run as an ad</Check>
+          </ul>
+          <Link to="/shorts?tab=ugc" className="lv-link">Make a UGC ad</Link>
+        </div>
+      </section>
+
+      {/* How it works — a real sequence */}
+      <section className="lv-steps">
+        <h2>Up and running in three steps</h2>
+        <ol>
+          <li><span>1</span><div><h3>Connect Higgsfield</h3><p>Sign in with your own account. Generations use your credits — no markup, no middleman.</p></div></li>
+          <li><span>2</span><div><h3>Create or pick a creator</h3><p>Answer a few questions or start from a template. Add a Claude key for smarter prompts and scripts.</p></div></li>
+          <li><span>3</span><div><h3>Generate, clip, post</h3><p>Photos, videos, UGC ads and shorts — download them or share straight to TikTok, Reels and YouTube.</p></div></li>
+        </ol>
+      </section>
+
+      {/* Closing */}
+      <section className="lv-close">
+        <div className="lv-close-faces" aria-hidden="true">
+          {['i13', 'i40', 'i22', 'i33', 'i8'].map(n => <img key={n} src={`/landing/${n}.webp`} alt="" loading="lazy" />)}
+        </div>
+        <h2>Meet your first creator in five minutes.</h2>
+        <div className="lv-ctas lv-ctas-center">
+          <button className="lv-btn lv-btn-primary" onClick={() => navigate('/create')}>Create a creator</button>
+          <a className="lv-btn lv-btn-quiet" href={BRAND.repoUrl} target="_blank" rel="noreferrer">View the code on GitHub</a>
+        </div>
+      </section>
 
       <style>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0; }
+        .lv { --lv-ink: var(--text-primary); --lv-muted: var(--text-secondary); --lv-pink: #EC4899; --lv-violet: #8B5CF6; --lv-cap: #FFE14D;
+          padding-top: var(--nav-h); background: var(--lv-bg, #FAF8FC); color: var(--lv-ink); overflow: hidden; }
+        [data-theme="dark"] .lv { --lv-bg: #0B0A10; }
+        .lv h1, .lv h2 { font-family: 'Archivo', Inter, sans-serif; font-stretch: 112%; font-weight: 800; letter-spacing: -0.035em; }
+        .lv h1 { font-size: clamp(40px, 6.2vw, 78px); line-height: 0.98; max-width: 11ch; }
+        .lv h2 { font-size: clamp(28px, 3.4vw, 44px); line-height: 1.04; max-width: 16ch; }
+        .lv h3 { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 6px; }
+        .lv p { line-height: 1.6; }
+
+        .lv-hero { max-width: 1240px; margin: 0 auto; padding: clamp(36px, 7vw, 92px) 28px 40px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; }
+        .lv-lede { font-size: clamp(16px, 1.35vw, 18.5px); color: var(--lv-muted); max-width: 54ch; margin: 26px 0 32px; }
+        .lv-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+        .lv-ctas-center { justify-content: center; }
+        .lv-btn { font: inherit; font-size: 15.5px; font-weight: 700; padding: 15px 26px; border-radius: 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; border: none; transition: transform .15s, box-shadow .15s, background .15s; }
+        .lv-btn:focus-visible, .lv-link:focus-visible { outline: 3px solid var(--lv-violet); outline-offset: 3px; }
+        .lv-btn-primary { background: ${BRAND.colors.gradient}; color: #fff; box-shadow: 0 8px 28px rgba(139,92,246,.35); }
+        .lv-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(139,92,246,.45); }
+        .lv-btn-quiet { background: transparent; color: var(--lv-ink); box-shadow: inset 0 0 0 1.5px var(--border); }
+        .lv-btn-quiet:hover { background: var(--bg-tertiary); }
+        .lv-fine { font-size: 13px; color: var(--text-tertiary); margin-top: 18px; }
+
+        .lv-hero-stage { position: relative; height: clamp(440px, 46vw, 600px); }
+        .lv-slot { position: absolute; top: 50%; left: 50%; transform: translate(calc(-50% + (var(--x) - 1) * 80%), calc(-50% + var(--y))) rotate(var(--tilt)); }
+        .lv-phone-md .lv-hook { display: none; }
+        .lv-phone-md .lv-cap { top: 74%; }
+        .lv-side-left .lv-cap { justify-content: flex-start; padding-right: 40%; }
+        .lv-side-right .lv-cap { justify-content: flex-end; padding-left: 40%; }
+        .lv-phone { position: relative; aspect-ratio: 9/16; border-radius: 26px; overflow: hidden; background: #000; box-shadow: 0 30px 70px rgba(26,21,35,.28), 0 0 0 6px #fff, 0 0 0 7px rgba(26,21,35,.08); container-type: inline-size; }
+        [data-theme="dark"] .lv-phone { box-shadow: 0 30px 70px rgba(0,0,0,.6), 0 0 0 6px #1C1A24, 0 0 0 7px rgba(255,255,255,.08); }
+        .lv-phone-lg { width: clamp(210px, 21vw, 290px); }
+        .lv-phone-md { width: clamp(170px, 17vw, 236px); filter: saturate(.92); }
+        .lv-phone-sm { width: clamp(150px, 15vw, 200px); }
+        .lv-phone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .lv-hook { position: absolute; top: 13%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 84%; text-align: center; background: #fff; color: #111; font-weight: 800; font-size: 6.4cqw; line-height: 1.2; padding: 3.2cqw 4.4cqw; border-radius: 3.4cqw; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+        .lv-cap { position: absolute; left: 0; right: 0; top: 66%; display: flex; justify-content: center; flex-wrap: wrap; gap: 0 2.6cqw; padding: 0 6cqw; font-weight: 900; font-size: 9.2cqw; text-transform: uppercase; color: #fff; letter-spacing: -0.01em; text-shadow: 0 0.6cqw 2cqw rgba(0,0,0,.5); -webkit-text-stroke: 1.2cqw #000; paint-order: stroke fill; }
+        .lv-cap span { transition: color .12s; }
+        .lv-cap span.on { color: var(--lv-cap); }
+        .lv-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 1.3cqw; background: rgba(255,255,255,.25); }
+        .lv-bar i { display: block; height: 100%; background: ${BRAND.colors.gradient}; transition: width .4s linear; }
+
+        .lv-for { max-width: 760px; margin: 10px auto 0; padding: 26px 28px 0; text-align: center; font-size: clamp(16px, 1.5vw, 19px); color: var(--lv-muted); border-top: 1px solid var(--border-subtle); }
+
+        .lv-row { max-width: 1140px; margin: 0 auto; padding: clamp(64px, 9vw, 120px) 28px 0; display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 80px); align-items: center; }
+        .lv-row-flip .lv-row-visual { order: 2; }
+        .lv-row-copy > p { color: var(--lv-muted); font-size: 16.5px; max-width: 50ch; margin: 18px 0 20px; }
+        .lv-list { list-style: none; display: grid; gap: 11px; margin-bottom: 26px; }
+        .lv-list li { display: flex; gap: 11px; align-items: flex-start; font-size: 15px; line-height: 1.45; }
+        .lv-list svg { color: var(--lv-violet); flex-shrink: 0; margin-top: 1px; }
+        .lv-link { font-weight: 700; font-size: 15px; color: var(--lv-violet); text-decoration: none; border-bottom: 2px solid rgba(139,92,246,.3); padding-bottom: 2px; }
+        .lv-link:hover { border-color: var(--lv-violet); }
+
+        .lv-mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 470px; justify-self: center; width: 100%; }
+        .lv-mosaic img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 18px; }
+        .lv-mosaic .m1, .lv-mosaic .m3 { transform: translateY(34px); }
+
+        .lv-reframe { display: flex; align-items: center; gap: 18px; justify-content: center; }
+        .lv-wide { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: clamp(200px, 24vw, 300px); aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; box-shadow: 0 16px 40px rgba(26,21,35,.18); }
+        .lv-wide img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 25%; }
+        .lv-wide-tag { position: absolute; left: 8px; bottom: 8px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); padding: 3px 8px; border-radius: 6px; }
+        .lv-arrow { color: var(--lv-violet); flex-shrink: 0; }
+
+        .lv-ugc { display: flex; align-items: center; justify-content: center; gap: 22px; }
+        .lv-script { max-width: 230px; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 18px 18px 4px 18px; padding: 16px 18px; font-size: 14.5px; line-height: 1.5; box-shadow: var(--shadow-md); }
+        .lv-script b { display: block; font-size: 12px; color: var(--lv-violet); margin-bottom: 6px; }
+
+        .lv-steps { max-width: 1140px; margin: 0 auto; padding: clamp(80px, 10vw, 140px) 28px 0; }
+        .lv-steps ol { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 34px; counter-reset: s; }
+        .lv-steps li { display: flex; gap: 16px; padding-top: 20px; border-top: 2px solid var(--lv-ink); }
+        .lv-steps li > span { font-family: 'Archivo', Inter, sans-serif; font-stretch: 125%; font-weight: 800; font-size: 30px; line-height: 1; color: var(--lv-violet); }
+        .lv-steps p { color: var(--lv-muted); font-size: 14.5px; }
+
+        .lv-close { text-align: center; padding: clamp(90px, 11vw, 150px) 28px clamp(80px, 10vw, 130px); }
+        .lv-close h2 { margin: 26px auto 28px; max-width: 18ch; }
+        .lv-close-faces { display: flex; justify-content: center; }
+        .lv-close-faces img { width: 62px; height: 62px; border-radius: 50%; object-fit: cover; border: 3px solid var(--lv-bg, #FAF8FC); margin-left: -14px; }
+        .lv-close-faces img:first-child { margin-left: 0; }
+        [data-theme="dark"] .lv-close-faces img { border-color: #0B0A10; }
+
+        @media (max-width: 900px) {
+          .lv-hero { grid-template-columns: 1fr; text-align: left; }
+          .lv-hero-stage { height: 470px; }
+          .lv-row { grid-template-columns: 1fr; }
+          .lv-row-flip .lv-row-visual { order: 0; }
+          .lv-steps ol { grid-template-columns: 1fr; }
         }
-        @keyframes ping {
-          0%        { transform: scale(1); opacity: 0.35; }
-          80%, 100% { transform: scale(2.4); opacity: 0; }
+        @media (max-width: 520px) {
+          .lv-hero-stage { height: 400px; }
+          .lv-slot { transform: translate(calc(-50% + (var(--x) - 1) * 62%), calc(-50% + var(--y))) rotate(var(--tilt)); }
+          .lv-phone-lg { width: 190px; } .lv-phone-md { width: 150px; }
+          .lv-reframe { flex-direction: column; } .lv-arrow { transform: rotate(90deg); }
+          .lv-ugc { flex-direction: column; }
         }
-        @keyframes orb1 {
-          0%, 100% { transform: translate(0,0) scale(1); }
-          33%       { transform: translate(55px,-45px) scale(1.07); }
-          66%       { transform: translate(-35px,38px) scale(0.93); }
-        }
-        @keyframes orb2 {
-          0%, 100% { transform: translate(0,0) scale(1); }
-          50%       { transform: translate(-45px,55px) scale(1.11); }
-        }
-        @keyframes orb3 {
-          0%, 100% { transform: translate(0,0) scale(1); }
-          40%       { transform: translate(35px,-55px) scale(0.90); }
-          70%       { transform: translate(-55px,22px) scale(1.08); }
-        }
-        @keyframes cardFloat {
-          0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-18px); }
-        }
-        @keyframes cardSway {
-          0%, 100% { transform: translateX(0px); }
-          25%       { transform: translateX(5px); }
-          75%       { transform: translateX(-4px); }
-        }
-        @keyframes cardAppear {
-          from { opacity: 0; }
-          to   { opacity: var(--target-opacity, 0.44); }
-        }
-        .landing-card { display: block; }
-        @media (max-width: 860px) { .landing-card { display: none; } }
+        @media (prefers-reduced-motion: reduce) { .lv-btn, .lv-bar i, .lv-cap span { transition: none; } }
       `}</style>
     </div>
   )

@@ -5,7 +5,7 @@ immediately. Read this first before making changes.
 
 ## What this app is
 
-A React+Vite single-page app for designing and generating AI influencers.
+**Lavi** (formerly "AI Influencer Studio"). A React+Vite single-page app for designing and generating AI influencers.
 Local-first: every user's data lives in their own browser localStorage.
 Image and video generation happens through the user's own Higgsfield
 account (OAuth, PKCE).
@@ -33,6 +33,11 @@ account (OAuth, PKCE).
 | `src/pages/Influencers.jsx` | Influencer profile + Content Studio + Video Studio (very large — known structural debt) |
 | `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
 | `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
+| `api/product.js` | Reads a public product page (title, description, og:image) for the UGC creator |
+| `src/brand.js` | Product name / colors — single place to rename |
+| `src/pages/Shorts.jsx` | Shorts Studio shell: Clip Generator, UGC Creator, YouTube Studio tabs |
+| `src/utils/shorts/*` | Whisper worker (transformers.js from CDN), MediaPipe reframing, canvas renderer, Claude prompts, Higgsfield dubbing/thumbnail/UGC calls |
+| `src/utils/claudeClient.js` | Shared Claude helper with model fallback |
 
 ## Conventions
 
@@ -44,6 +49,14 @@ account (OAuth, PKCE).
   `nano_banana_flash`, `seedance_2_0`. Soul has its own simplified
   pose set (`POSES_SOUL`) because it struggles with detailed spatial pose
   instructions.
+
+## Shorts Studio notes
+
+- transformers.js and MediaPipe load from jsDelivr at runtime (not npm) so the bundle
+  stays small and Vercel never installs onnxruntime-node.
+- Projects (source video, transcript, clips, renders) live in IndexedDB (`lavi_shorts`).
+- Rendering is real-time via canvas + MediaRecorder; Chrome emits MP4 (H.264/AAC),
+  other browsers may emit WebM.
 
 ## Things not to do
 

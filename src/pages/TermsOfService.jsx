@@ -5,15 +5,15 @@ export default function TermsOfService() {
       <p style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 40 }}>Last updated: June 8, 2026</p>
 
       <Section title="Acceptance of Terms">
-        By accessing or using Influencer Studio, you agree to be bound by these Terms of Service. If you do not agree, please do not use the app.
+        By accessing or using Lavi, you agree to be bound by these Terms of Service. If you do not agree, please do not use the app.
       </Section>
 
       <Section title="Use of the Service">
-        Influencer Studio is a platform for creating and managing AI-generated influencer personas. You may use the service for personal or commercial creative projects, subject to the restrictions below.
+        Lavi is a platform for creating and managing AI-generated influencer personas. You may use the service for personal or commercial creative projects, subject to the restrictions below.
       </Section>
 
       <Section title="Prohibited Use">
-        You agree not to use Influencer Studio to:
+        You agree not to use Lavi to:
         <ul style={{ marginTop: 8, paddingLeft: 20, lineHeight: 2 }}>
           <li>Create content that is illegal, harmful, abusive, or defamatory</li>
           <li>Impersonate real individuals without their consent</li>
@@ -25,7 +25,7 @@ export default function TermsOfService() {
       </Section>
 
       <Section title="AI-Generated Content">
-        Content generated through Influencer Studio is produced by third-party AI models (Higgsfield). We do not guarantee the accuracy, quality, or legality of AI-generated content. You are solely responsible for how you use and distribute generated content. Commercial use rights are governed by Higgsfield's terms of service.
+        Content generated through Lavi is produced by third-party AI models (Higgsfield). We do not guarantee the accuracy, quality, or legality of AI-generated content. You are solely responsible for how you use and distribute generated content. Commercial use rights are governed by Higgsfield's terms of service.
       </Section>
 
       <Section title="Your Account">
@@ -33,11 +33,11 @@ export default function TermsOfService() {
       </Section>
 
       <Section title="Intellectual Property">
-        Influencer Studio and its original content, features, and design are owned by us. AI-generated content rights are subject to the terms of the underlying model providers.
+        Lavi and its original content, features, and design are owned by us. AI-generated content rights are subject to the terms of the underlying model providers.
       </Section>
 
       <Section title="Disclaimer of Warranties">
-        Influencer Studio is provided "as is" without warranties of any kind, express or implied. We do not guarantee uninterrupted or error-free service.
+        Lavi is provided "as is" without warranties of any kind, express or implied. We do not guarantee uninterrupted or error-free service.
       </Section>
 
       <Section title="Limitation of Liability">

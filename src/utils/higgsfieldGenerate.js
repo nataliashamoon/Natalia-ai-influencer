@@ -379,7 +379,9 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
           || extractVideoUrls(result)[0] || null
         const shareUrl = resultsObj?.shareUrl || resultsObj?.share_url || item?.shareUrl || item?.share_url
           || extractShareUrls(result)[0] || null
-        const status = (item?.status || data?.status || '').toLowerCase()
+        // job_status can also answer in plain text: "Job <id> — waiting" / "… — failed"
+        const textStatus = typeof data === 'string' ? (data.match(/—\s*([a-z_]+)/i) || [])[1] : ''
+        const status = (item?.status || data?.status || textStatus || '').toLowerCase()
 
         if (!url && typeof data === 'string' && isHFErrorText(data)) {
           const n = (errorRounds.get(jobId) || 0) + 1
@@ -404,6 +406,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
           }
         } else if (VIDEO_FAIL_TERMINAL.has(status)) {
           pending.delete(jobId)
+          lastError = `the job ${status === 'failed' ? 'failed' : `ended as "${status}"`}`
           console.warn('[HF-VID] job', jobId.slice(0, 8), 'failed, status:', status)
         } else if (VIDEO_SOFT_TERMINAL.has(status)) {
           // Job says completed but no URL yet — CDN propagation lag or format mismatch.

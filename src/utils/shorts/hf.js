@@ -80,7 +80,9 @@ export async function makeUgcVideo({ script, actorImage, productImage, duration 
   const prompt = [
     'Authentic UGC-style vertical selfie video, filmed on a phone held at arm\'s length, natural light, handheld micro-movement, looks like a real TikTok creator.',
     actorId ? 'The creator is the person in @image_1 — keep their exact face, hair and identity.' : '',
-    productId ? `They ${action || 'hold and show'} the product from @image_${actorId ? 2 : 1}, keeping its exact look and packaging.` : (action ? `They ${action}.` : ''),
+    // `action` comes from the script writer as a phrase like "holding the product up to the camera"
+    action ? `Action: ${action}.` : (productId ? 'Action: holding the product up to the camera.' : ''),
+    productId ? `The product is the one in @image_${actorId ? 2 : 1} — keep its exact look and packaging.` : '',
     setting ? `Setting: ${setting}.` : '',
     `They look straight into the camera and say, with natural lip sync and expressive delivery${voice ? ` (${voice} voice)` : ''}: "${script.replace(/"/g, "'")}"`,
     'Clear speech audio, no background music, no on-screen text, no subtitles.',

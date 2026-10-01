@@ -1,90 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Card, Btn, Label, Segmented, Progress, Toggle, CopyBtn, inputStyle, ScoreBadge, ErrorNote, HiggsfieldNotice, useHiggsfield, downloadBlob, downloadUrl, slug } from './ui'
-import { drawFrame, buildCaptionGroups, renderClip, ensureFonts, CAPTION_STYLES, DEFAULT_OPTIONS, OUT_W, OUT_H } from '../../utils/shorts/render'
-import { analyzeFraming } from '../../utils/shorts/reframe'
+import { useEffect, useState } from 'react'
+import { Card, Btn, Label, Segmented, Progress, Toggle, CopyBtn, inputStyle, ScoreBadge, ErrorNote, HiggsfieldNotice, downloadBlob, downloadUrl, slug } from './ui'
+import { CAPTION_STYLES } from '../../utils/shorts/render'
 import { GRADES } from '../../utils/shorts/ai'
 import { fmtTime } from '../../utils/shorts/transcribe'
-import { putBlob, getBlob } from '../../utils/shorts/db'
-import { dubClip, DUB_LANGUAGES } from '../../utils/shorts/hf'
+import { DUB_LANGUAGES } from '../../utils/shorts/hf'
+import ClipPreview from './ClipPreview'
+import { useClipActions, analyzeClipFraming, clipOptions, clipCaption } from './useClipActions'
 
 const LAYOUTS = [['auto', 'Auto'], ['track', 'Follow face'], ['split', 'Split'], ['fit', 'Fit'], ['center', 'Center']]
 
 export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
-  const canvasRef = useRef(null)
-  const videoRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [framingBusy, setFramingBusy] = useState(false)
   const [framingProgress, setFramingProgress] = useState(0)
-  const [rendering, setRendering] = useState(null) // progress 0..1
-  const [renderUrl, setRenderUrl] = useState(null)
-  const [renderMeta, setRenderMeta] = useState(null)
   const [dubLang, setDubLang] = useState('spa')
-  const [dubbing, setDubbing] = useState(null)
-  const [error, setError] = useState(null)
-  const abortRef = useRef(null)
+  const actions = useClipActions({ project, clip, srcUrl, words, onChange })
+  const { renderMeta, rendering, paused, dubbing, error, setError } = actions
 
-  const options = { ...DEFAULT_OPTIONS, grade: clip.grade || DEFAULT_OPTIONS.grade, ...(clip.options || {}) }
+  const options = clipOptions(clip)
   const setOpt = (k, v) => onChange({ ...clip, options: { ...(clip.options || {}), [k]: v }, renderKey: null })
-  const groups = useMemo(() => buildCaptionGroups(words, clip.start, clip.end, options.wordsPerLine), [words, clip.start, clip.end, options.wordsPerLine])
-
-  // Load an existing render for this clip
-  useEffect(() => {
-    let url = null
-    setRenderUrl(null); setRenderMeta(null); setError(null)
-    if (clip.renderKey) getBlob(clip.renderKey).then(b => { if (b) { url = URL.createObjectURL(b); setRenderUrl(url); setRenderMeta({ blob: b, ext: b.type.includes('mp4') ? 'mp4' : 'webm' }) } })
-    return () => { if (url) URL.revokeObjectURL(url) }
-  }, [clip.id, clip.renderKey])
 
   // Face analysis for smart reframing (cached on the clip)
   useEffect(() => {
     if (clip.framing || !srcUrl) return
     let cancelled = false
-    const v = document.createElement('video')
-    v.src = srcUrl; v.muted = true; v.preload = 'auto'
     setFramingBusy(true); setFramingProgress(0)
-    v.onloadedmetadata = async () => {
-      try {
-        const f = await analyzeFraming(v, clip.start, clip.end, { step: Math.max(0.5, (clip.end - clip.start) / 70), onProgress: p => !cancelled && setFramingProgress(p) })
-        if (!cancelled) onChange({ ...clip, framing: f })
-      } catch (e) { console.warn(e) }
-      finally { if (!cancelled) setFramingBusy(false); v.removeAttribute('src'); v.load() }
-    }
+    analyzeClipFraming(srcUrl, clip, p => !cancelled && setFramingProgress(p))
+      .then(f => { if (!cancelled) onChange({ ...clip, framing: f }) })
+      .catch(e => console.warn(e))
+      .finally(() => { if (!cancelled) setFramingBusy(false) })
     return () => { cancelled = true }
   }, [clip.id, clip.start, clip.end, srcUrl, !!clip.framing])
-
-  // Live preview loop
-  useEffect(() => {
-    const v = videoRef.current, c = canvasRef.current
-    if (!v || !c) return
-    const ctx = c.getContext('2d')
-    let raf
-    ensureFonts()
-    const loop = () => {
-      const t = v.currentTime - clip.start
-      if (v.currentTime >= clip.end) { v.pause(); v.currentTime = clip.start; setPlaying(false) }
-      drawFrame(ctx, v, { clip, groups, framing: clip.framing, options, t: Math.max(0, t) })
-      raf = requestAnimationFrame(loop)
-    }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  })
-
-  useEffect(() => {
-    const v = videoRef.current
-    if (!v) return
-    v.pause(); setPlaying(false)
-    const seekStart = () => { v.currentTime = clip.start }
-    if (v.readyState >= 1) seekStart(); else v.addEventListener('loadedmetadata', seekStart, { once: true })
-  }, [clip.id, clip.start, srcUrl])
-
-  function togglePlay() {
-    const v = videoRef.current
-    if (!v) return
-    if (v.paused) {
-      if (v.currentTime < clip.start || v.currentTime >= clip.end - 0.1) v.currentTime = clip.start
-      v.play(); setPlaying(true)
-    } else { v.pause(); setPlaying(false) }
-  }
 
   function nudge(field, d) {
     const dur = project.duration
@@ -94,65 +40,25 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
     onChange({ ...clip, start, end, framing: null, renderKey: null })
   }
 
-  async function exportClip() {
-    setError(null)
-    const ctrl = new AbortController(); abortRef.current = ctrl
-    videoRef.current?.pause(); setPlaying(false)
-    setRendering(0)
-    try {
-      const { blob, ext } = await renderClip({ src: srcUrl, clip, words, framing: clip.framing, options, onProgress: setRendering, signal: ctrl.signal })
-      const key = `render_${project.id}_${clip.id}_${Date.now()}`
-      await putBlob(key, blob).catch(() => {})
-      onChange({ ...clip, renderKey: key })
-      const url = URL.createObjectURL(blob)
-      setRenderUrl(url); setRenderMeta({ blob, ext })
-      downloadBlob(blob, `${slug(clip.title)}.${ext}`)
-    } catch (e) {
-      if (e.message !== 'CANCELLED') setError(e.message)
-    } finally { setRendering(null); abortRef.current = null }
-  }
-
-  const hf = useHiggsfield()
-
-  async function dub() {
-    if (!renderMeta?.blob) return
-    setError(null)
-    if (!hf.connected && !(await hf.connect().catch(e => { setError(e.message); return false }))) return
-    setDubbing(0)
-    try {
-      const url = await dubClip(renderMeta.blob, dubLang, { onProgress: setDubbing })
-      onChange({ ...clip, dubs: { ...(clip.dubs || {}), [dubLang]: { url, at: Date.now() } } })
-    } catch (e) { setError(e.message) } finally { setDubbing(null) }
-  }
-
   async function share() {
-    if (!renderMeta?.blob) return
-    const file = new File([renderMeta.blob], `${slug(clip.title)}.${renderMeta.ext}`, { type: renderMeta.blob.type })
-    const text = `${clip.caption || clip.title}\n\n${(clip.hashtags || []).map(h => '#' + h).join(' ')}`
-    if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], text, title: clip.title }) } catch {}
-    } else setError('Sharing files works on phones and Safari. Download the clip, then upload it on TikTok, Instagram or YouTube.')
+    setPlaying(false)
+    if (!(await actions.share())) setError('Sharing files works on phones and Safari. Download the clip, then upload it on TikTok, Instagram or YouTube.')
   }
 
-  const caption = `${clip.caption || clip.title}\n\n${(clip.hashtags || []).map(h => '#' + h).join(' ')}`.trim()
+  const caption = clipCaption(clip)
   const layoutUsed = options.layout === 'auto' ? (clip.framing?.layout || '…') : options.layout
 
   return (
     <div className="lavi-editor" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) 1fr', gap: 22, alignItems: 'start' }}>
       {/* Preview */}
       <div style={{ position: 'sticky', top: 'calc(var(--nav-h) + 16px)' }}>
-        <div style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: '#000', aspectRatio: '9/16', boxShadow: 'var(--shadow-lg)' }}>
-          <canvas ref={canvasRef} width={OUT_W} height={OUT_H} style={{ width: '100%', height: '100%', display: 'block' }} onClick={togglePlay} />
-          {!playing && (
-            <button onClick={togglePlay} aria-label="Play preview" style={{ position: 'absolute', inset: 0, margin: 'auto', width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 22, cursor: 'pointer' }}>▶</button>
-          )}
-          {framingBusy && (
+        <ClipPreview clip={clip} srcUrl={srcUrl} words={words} playing={playing} onPlayingChange={setPlaying}
+          style={{ borderRadius: 22, boxShadow: 'var(--shadow-lg)' }}
+          overlay={framingBusy && (
             <div style={{ position: 'absolute', left: 12, right: 12, bottom: 18, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 11.5 }}>
               Finding faces for smart crop… {Math.round(framingProgress * 100)}%
             </div>
-          )}
-        </div>
-        <video ref={videoRef} src={srcUrl} playsInline preload="auto" style={{ display: 'none' }} onEnded={() => setPlaying(false)} />
+          )} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 12.5, color: 'var(--text-secondary)' }}>
           <span>{fmtTime(clip.start)} – {fmtTime(clip.end)} · {Math.round(clip.end - clip.start)}s</span>
           <span title={clip.framing?.reason}>Layout: <b style={{ color: 'var(--text-primary)' }}>{layoutUsed}</b></span>
@@ -221,12 +127,12 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
           <ErrorNote onClose={() => setError(null)}>{error}</ErrorNote>
           {rendering != null ? (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ flex: 1 }}><Progress value={rendering} label="Rendering your short" sub={`${Math.round(rendering * 100)}% · keep this tab open`} /></div>
-              <Btn size="sm" kind="ghost" onClick={() => abortRef.current?.abort()}>Cancel</Btn>
+              <div style={{ flex: 1 }}><Progress value={rendering} label="Rendering your short" sub={paused ? 'Paused — come back to this tab to continue' : `${Math.round(rendering * 100)}% · keep this tab open`} /></div>
+              <Btn size="sm" kind="ghost" onClick={actions.cancel}>Cancel</Btn>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Btn onClick={exportClip} disabled={framingBusy && !clip.framing}>{framingBusy && !clip.framing ? 'Framing…' : renderUrl ? 'Re-export' : 'Export video'}</Btn>
+              <Btn onClick={() => { setPlaying(false); actions.exportClip() }} disabled={framingBusy && !clip.framing}>{framingBusy && !clip.framing ? 'Framing…' : 'Export video'}</Btn>
               {renderMeta && <Btn kind="secondary" onClick={() => downloadBlob(renderMeta.blob, `${slug(clip.title)}.${renderMeta.ext}`)}>Download {renderMeta.ext.toUpperCase()}</Btn>}
               {renderMeta && <Btn kind="secondary" onClick={share}>Share…</Btn>}
             </div>
@@ -241,7 +147,7 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
                   <select value={dubLang} onChange={e => setDubLang(e.target.value)} style={{ ...inputStyle, width: 170, padding: '8px 11px' }}>
                     {DUB_LANGUAGES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
                   </select>
-                  <Btn kind="secondary" disabled={dubbing != null} onClick={dub}>{dubbing != null ? `Dubbing… ${Math.round(dubbing * 100)}%` : 'Dub clip'}</Btn>
+                  <Btn kind="secondary" disabled={dubbing != null} onClick={() => actions.dub(dubLang)}>{dubbing != null ? `Dubbing… ${Math.round(dubbing * 100)}%` : 'Dub clip'}</Btn>
                 </div>
                 {Object.entries(clip.dubs || {}).length > 0 && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>

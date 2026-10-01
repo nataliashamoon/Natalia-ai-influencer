@@ -255,7 +255,7 @@ export async function ensureFonts() {
 }
 
 // Renders one clip in real time. Resolves with { blob, mime, ext }.
-export async function renderClip({ src, clip, words, framing, options, onProgress, signal }) {
+export async function renderClip({ src, clip, words, framing, options, onProgress, onPausedChange, signal }) {
   await ensureFonts()
   const video = document.createElement('video')
   video.src = src
@@ -275,7 +275,13 @@ export async function renderClip({ src, clip, words, framing, options, onProgres
   const srcNode = actx.createMediaElementSource(video)
   const dest = actx.createMediaStreamDestination()
   srcNode.connect(dest)
-  await actx.resume().catch(() => {})
+  // Browsers only start audio after the user has clicked on the page; without
+  // that, resume() never settles, so don't wait on it forever.
+  await Promise.race([actx.resume().catch(() => {}), new Promise(r => setTimeout(r, 3000))])
+  if (actx.state !== 'running') {
+    actx.close?.(); video.removeAttribute('src'); video.load()
+    throw new Error('Your browser blocked audio for this export. Click anywhere on the page, then try again.')
+  }
 
   const stream = canvas.captureStream(30)
   dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr))
@@ -290,22 +296,41 @@ export async function renderClip({ src, clip, words, framing, options, onProgres
 
   const done = new Promise(resolve => { rec.onstop = resolve })
   rec.start(250)
-  await video.play()
+  try { await video.play() } catch (e) {
+    rec.stop(); actx.close?.()
+    throw new Error(e.name === 'NotAllowedError' ? 'Your browser blocked playback for this export. Click anywhere on the page, then try again.' : `Couldn't play the video: ${e.message}`)
+  }
 
   const dur = clip.end - clip.start
   await new Promise((resolve, reject) => {
-    let raf // eslint-disable-line no-unused-vars
+    let raf = null
     const tick = () => {
-      if (signal?.aborted) { video.pause(); reject(new Error('CANCELLED')); return }
+      raf = null
+      if (signal?.aborted) { cleanup(); video.pause(); reject(new Error('CANCELLED')); return }
       const t = video.currentTime - clip.start
       drawFrame(ctx, video, { clip, groups, framing, options, t })
       onProgress?.(Math.min(1, t / dur))
-      if (video.currentTime >= clip.end || video.ended) { video.pause(); resolve(); return }
-      schedule()
+      if (video.currentTime >= clip.end || video.ended) { cleanup(); video.pause(); resolve(); return }
+      if (!document.hidden) raf = requestAnimationFrame(tick)
     }
-    // rAF stops in background tabs; fall back to timers so the export keeps going
-    const schedule = () => { if (document.hidden) setTimeout(tick, 33); else raf = requestAnimationFrame(tick) }
-    schedule()
+    // A hidden tab only gets ~1 timer tick per second, which records a ~1 fps
+    // clip. Pause the recording while hidden and pick up where it left off.
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf), raf = null
+        video.pause(); if (rec.state === 'recording') rec.pause()
+        onPausedChange?.(true)
+      } else {
+        onPausedChange?.(false)
+        if (rec.state === 'paused') rec.resume()
+        video.play().then(() => { if (!raf) raf = requestAnimationFrame(tick) }, () => {})
+      }
+    }
+    const onAbort = () => { if (document.hidden) tick() }
+    const cleanup = () => { document.removeEventListener('visibilitychange', onVisibility); signal?.removeEventListener('abort', onAbort) }
+    document.addEventListener('visibilitychange', onVisibility)
+    signal?.addEventListener('abort', onAbort)
+    if (document.hidden) onVisibility(); else raf = requestAnimationFrame(tick)
   })
 
   rec.stop()

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, Btn, Label, Segmented, Progress, ScoreBadge, ErrorNote, inputStyle, G } from './ui'
+import { Card, Btn, Label, Segmented, Progress, ErrorNote, inputStyle, G, downloadBlob, slug } from './ui'
 import ClipEditor from './ClipEditor'
+import ClipCard from './ClipCard'
+import { analyzeClipFraming } from './useClipActions'
+import { zipFiles } from '../../utils/shorts/zip'
 import YouTubeKit from './YouTubeKit'
 import { decodeAudio, transcribeAudio, wordsToSegments, fmtTime } from '../../utils/shorts/transcribe'
 import { detectMoments } from '../../utils/shorts/ai'
@@ -39,7 +42,11 @@ export default function ClipGenerator({ mode = 'clips' }) {
   const [settings, setSettings] = useState({ count: 8, length: 'mid', quality: 'balanced', language: '', context: '' })
   const [stage, setStage] = useState(null) // {step, status, progress}
   const [error, setError] = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [playingId, setPlayingId] = useState(null)
+  const [exportQueue, setExportQueue] = useState([]) // clip ids left to render for "Download all"
+  const [zipping, setZipping] = useState(false)
+  const zipParts = useRef([])
   const [view, setView] = useState(mode === 'youtube' ? 'youtube' : 'clips')
   const [dragging, setDragging] = useState(false)
   const fileInput = useRef(null)
@@ -61,17 +68,21 @@ export default function ClipGenerator({ mode = 'clips' }) {
     if (!blob) { setError('The original video for this project is no longer stored in this browser. Upload it again to keep editing.'); return }
     if (srcUrl) URL.revokeObjectURL(srcUrl)
     setSrcUrl(URL.createObjectURL(blob))
-    setProject(full); setSelectedId(full.clips?.[0]?.id || null)
+    setProject(full); setEditingId(null); setPlayingId(null)
   }
 
+  // Accepts a project or an updater function (cards can save at the same time)
   function updateProject(next) {
-    setProject(next)
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      // framing samples are bulky — keep only what rendering needs
-      const slim = { ...next, clips: next.clips.map(c => c.framing ? { ...c, framing: { ...c.framing, samples: undefined } } : c) }
-      saveProject(slim).then(() => listProjects().then(setProjects)).catch(() => {})
-    }, 400)
+    setProject(prev => {
+      const value = typeof next === 'function' ? next(prev) : next
+      clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        // framing samples are bulky — keep only what rendering needs
+        const slim = { ...value, clips: value.clips.map(c => c.framing ? { ...c, framing: { ...c.framing, samples: undefined } } : c) }
+        saveProject(slim).then(() => listProjects().then(setProjects)).catch(() => {})
+      }, 400)
+      return value
+    })
   }
 
   async function run() {
@@ -105,7 +116,7 @@ export default function ClipGenerator({ mode = 'clips' }) {
         sourceKey: stored ? sourceKey : null, words, segments, clips, context: settings.context, kind: mode,
       }
       await saveProject(p).catch(() => {})
-      setSrcUrl(url); setProject(p); setSelectedId(clips[0]?.id || null); setFile(null)
+      setSrcUrl(url); setProject(p); setEditingId(null); setPlayingId(null); setFile(null)
       if (mode === 'youtube') setView('youtube')
       listProjects().then(setProjects)
     } catch (e) {
@@ -126,7 +137,46 @@ export default function ClipGenerator({ mode = 'clips' }) {
     } catch (e) { setError(e.message) } finally { setStage(null) }
   }
 
-  const selected = project?.clips.find(c => c.id === selectedId)
+  const editing = project?.clips.find(c => c.id === editingId)
+
+  function downloadAll() {
+    setPlayingId(null); setError(null)
+    zipParts.current = []
+    setExportQueue(project.clips.map(c => c.id))
+  }
+
+  // Each card renders in turn and hands back its file; after the last one,
+  // everything goes out as a single ZIP.
+  async function finishQueued(part) {
+    if (part) zipParts.current.push(part)
+    if (exportQueue.length > 1) { setExportQueue(q => q.slice(1)); return }
+    setExportQueue([])
+    const parts = zipParts.current; zipParts.current = []
+    if (!parts.length) { setError('None of the clips could be rendered.'); return }
+    if (parts.length < project.clips.length) setError(`${project.clips.length - parts.length} clip(s) couldn't be rendered and were left out of the ZIP.`)
+    setZipping(true)
+    try { downloadBlob(await zipFiles(parts), `${slug(project.name)}-clips.zip`) }
+    catch (e) { setError(`Couldn't build the ZIP: ${e.message}`) }
+    finally { setZipping(false) }
+  }
+
+  // Face-track the feed's clips in the background, one at a time, so previews
+  // and exports use the smart crop. The editor tracks its own clip when open.
+  const framingNext = !editingId && project?.clips.find(c => !c.framing)
+  useEffect(() => {
+    if (!framingNext || !srcUrl) return
+    let cancelled = false
+    const { id, start, end } = framingNext
+    analyzeClipFraming(srcUrl, framingNext)
+      .catch(() => ({ layout: 'center', samples: [], reason: 'Face tracking failed — centered crop' }))
+      .then(framing => {
+        if (cancelled) return
+        updateProject(p => ({ ...p, clips: p.clips.map(c => c.id === id && c.start === start && c.end === end && !c.framing ? { ...c, framing } : c) }))
+      })
+    return () => { cancelled = true }
+  }, [framingNext?.id, framingNext?.start, framingNext?.end, srcUrl])
+  // Functional update: several cards can save at once (e.g. framing + render during Download all)
+  const updateClip = c => updateProject(p => ({ ...p, clips: p.clips.map(x => x.id === c.id ? c : x) }))
 
   // ── Processing ──
   if (stage) {
@@ -156,7 +206,7 @@ export default function ClipGenerator({ mode = 'clips' }) {
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
-          <Btn kind="ghost" size="sm" onClick={() => { setProject(null); setSelectedId(null) }}>← Projects</Btn>
+          <Btn kind="ghost" size="sm" onClick={() => { setProject(null); setEditingId(null); setPlayingId(null); setExportQueue([]) }}>← Projects</Btn>
           <h3 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px', marginRight: 'auto' }}>{project.name}</h3>
           <Segmented size="sm" value={view} onChange={setView} options={[['clips', `Clips (${project.clips.length})`], ['youtube', 'YouTube kit'], ['transcript', 'Transcript']]} />
         </div>
@@ -169,40 +219,49 @@ export default function ClipGenerator({ mode = 'clips' }) {
               <Btn onClick={addMore}>Find viral clips</Btn>
             </Card>
           ) : (
-            <div className="lavi-clips" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 22, alignItems: 'start', marginTop: 4 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {project.clips.map((c, i) => {
-                  const on = c.id === selectedId
-                  return (
-                    <button key={c.id} onClick={() => setSelectedId(c.id)} style={{
-                      textAlign: 'left', padding: 14, borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
-                      background: on ? 'var(--surface)' : 'transparent', border: on ? '1.5px solid #8B5CF6' : '1px solid var(--border-subtle)',
-                      boxShadow: on ? '0 0 0 4px rgba(139,92,246,0.10)' : 'none', color: 'var(--text-primary)',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-tertiary)' }}>#{i + 1}</span>
-                        <ScoreBadge score={c.score} />
-                        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-tertiary)' }}>{Math.round(c.end - c.start)}s</span>
-                        {c.renderKey && <span title="Exported" style={{ fontSize: 11, color: '#10B981' }}>●</span>}
-                      </div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.35, marginBottom: 4 }}>{c.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtTime(c.start)} – {fmtTime(c.end)}</div>
-                    </button>
-                  )
-                })}
-                <Btn kind="ghost" size="sm" onClick={addMore}>+ Find more clips</Btn>
-              </div>
-              {selected && (
+            editing ? (
+              <div>
+                <Btn kind="ghost" size="sm" onClick={() => setEditingId(null)} style={{ marginBottom: 14 }}>← All clips</Btn>
                 <ClipEditor
-                  key={selected.id}
+                  key={editing.id}
                   project={project}
-                  clip={selected}
+                  clip={editing}
                   srcUrl={srcUrl}
                   words={project.words}
-                  onChange={c => updateProject({ ...project, clips: project.clips.map(x => x.id === c.id ? c : x) })}
+                  onChange={updateClip}
                 />
-              )}
-            </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', marginRight: 'auto' }}>
+                    {project.clips.length} clips, best first · tap a clip to preview it with captions
+                    {project.clips.some(c => c.offline) && <> · picked by the offline scorer — add a Claude key in <a href="/settings" style={{ color: '#8B5CF6', fontWeight: 700 }}>Settings</a> for AI picks, hooks and captions</>}
+                  </span>
+                  <Btn kind="ghost" size="sm" onClick={addMore}>+ Find more clips</Btn>
+                  <Btn size="sm" disabled={exportQueue.length > 0 || zipping} onClick={downloadAll}>
+                    {exportQueue.length ? `Rendering… ${project.clips.length - exportQueue.length + 1}/${project.clips.length}` : zipping ? 'Zipping…' : '⬇ Download all'}
+                  </Btn>
+                </div>
+                <div className="lavi-feed" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 18, alignItems: 'start' }}>
+                  {project.clips.map((c, i) => (
+                    <ClipCard
+                      key={c.id}
+                      index={i}
+                      clip={c}
+                      project={project}
+                      srcUrl={srcUrl}
+                      playing={playingId === c.id}
+                      onPlayingChange={on => setPlayingId(on ? c.id : id => (id === c.id ? null : id))}
+                      onChange={updateClip}
+                      onEdit={() => setEditingId(c.id)}
+                      queued={exportQueue[0] === c.id}
+                      onQueueDone={finishQueued}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
           )
         )}
 

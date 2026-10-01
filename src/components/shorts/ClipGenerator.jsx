@@ -11,12 +11,23 @@ const LENGTHS = [['short', '15–30s'], ['mid', '30–60s'], ['long', '60–90s'
 const LEN_RANGE = { short: [15, 30], mid: [30, 60], long: [60, 90] }
 const LANGS = [['', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['pt', 'Portuguese'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ja', 'Japanese'], ['ko', 'Korean'], ['zh', 'Chinese']]
 
+const UNPLAYABLE = "Your browser can't play this video. It may be HEVC / H.265 (common for iPhone and TikTok downloads) — export or convert it to an H.264 MP4 and try again."
+
 function videoDuration(url) {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video')
-    v.preload = 'metadata'; v.src = url
-    v.onloadedmetadata = () => resolve({ duration: v.duration, width: v.videoWidth, height: v.videoHeight })
-    v.onerror = () => reject(new Error('This file type cannot be played in the browser. Try MP4 or MOV.'))
+    // Chrome doesn't load media in a background tab, so the timeout only starts
+    // counting while the tab is visible — otherwise this would wait forever.
+    let waited = 0
+    const tick = setInterval(() => {
+      if (document.hidden) return
+      if ((waited += 1) >= 20) { clearInterval(tick); reject(new Error(UNPLAYABLE)) }
+    }, 1000)
+    const done = fn => arg => { clearInterval(tick); fn(arg) }
+    v.preload = 'metadata'; v.muted = true
+    v.onloadedmetadata = done(() => resolve({ duration: v.duration, width: v.videoWidth, height: v.videoHeight }))
+    v.onerror = done(() => reject(new Error(UNPLAYABLE)))
+    v.src = url
   })
 }
 
@@ -69,6 +80,7 @@ export default function ClipGenerator({ mode = 'clips' }) {
     const id = Math.random().toString(36).slice(2, 10)
     const url = URL.createObjectURL(file)
     try {
+      setStage({ step: 1, status: document.hidden ? 'Waiting for this tab to be in front…' : 'Reading video…', progress: null })
       const meta = await videoDuration(url)
       setStage({ step: 1, status: 'Extracting audio…', progress: null })
       const audio = await decodeAudio(file, s => setStage(st => ({ ...st, status: s })))

@@ -45,13 +45,16 @@ export default function Nav() {
       <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
         <span style={{
           width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-          border: 'none',
+          background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+          border: dark ? '1px solid rgba(255,255,255,0.12)' : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.35)',
           transition: 'background 0.5s',
         }}>
-          <svg width="14" height="14" viewBox="0 0 64 64" fill="none"><path d="M22 15v30h20" stroke="white" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/><circle cx="45" cy="18" r="6" fill="#FFE14D"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="5" r="3" fill="white" opacity="0.95"/>
+            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.95"/>
+          </svg>
         </span>
         <span className="nav-brand-label" style={{
           fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',

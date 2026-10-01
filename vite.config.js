@@ -128,6 +128,8 @@ export default defineConfig({
         target: 'https://mcp.higgsfield.ai',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api\/hf/, ''),
+        // Same as api/hfproxy.js: Higgsfield rejects browser Origin headers
+        configure: proxy => proxy.on('proxyReq', req => { req.removeHeader('origin'); req.removeHeader('referer'); req.removeHeader('cookie') }),
       },
     },
   },

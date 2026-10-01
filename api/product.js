@@ -32,7 +32,13 @@ export default async function handler(req, res) {
     const title = meta(html, ['og:title', 'twitter:title']) || (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || '').trim()
     const description = meta(html, ['og:description', 'description', 'twitter:description'])
     let image = meta(html, ['og:image', 'og:image:secure_url', 'twitter:image'])
-    if (image) { try { image = new URL(image, url).toString() } catch { image = '' } }
+    if (image) {
+      try {
+        const u = new URL(image, url)
+        if (u.protocol === 'http:') u.protocol = 'https:' // many shops still list http og:images; Higgsfield needs https
+        image = u.toString()
+      } catch { image = '' }
+    }
     const price = meta(html, ['product:price:amount', 'og:price:amount'])
     return res.status(200).json({ name: decode(title).slice(0, 200), description: decode(description).slice(0, 1200), image, price, url: url.toString() })
   } catch (e) {

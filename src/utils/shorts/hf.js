@@ -32,6 +32,7 @@ export async function toMediaId(src, type = 'image') {
   // Data URLs and this app's own files (e.g. /kayla/main.jpg) are uploaded from the
   // browser: Higgsfield can't fetch a relative path, or a preview behind Vercel login.
   const url = new URL(src, window.location.href)
+  if (url.protocol === 'http:' && url.origin !== window.location.origin) url.protocol = 'https:' // Higgsfield only imports https
   if (src.startsWith('data:') || url.origin === window.location.origin) {
     const r = await fetch(url)
     if (!r.ok) throw new Error(`Could not load image (${r.status})`)

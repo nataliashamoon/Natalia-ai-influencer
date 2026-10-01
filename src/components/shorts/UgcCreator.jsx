@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, Btn, Label, Segmented, Progress, ErrorNote, inputStyle, downloadUrl, CopyBtn, G, slug } from './ui'
+import { Card, Btn, Label, Segmented, Progress, ErrorNote, HiggsfieldNotice, useHiggsfield, inputStyle, downloadUrl, CopyBtn, G, slug } from './ui'
 import { useInfluencers } from '../../store'
 import { ugcScripts } from '../../utils/shorts/ai'
 import { makeUgcVideo, estimateUgcCost } from '../../utils/shorts/hf'
 import { hasClaudeKey } from '../../utils/claudeClient'
-import { isHFConnected, startHiggsfieldOAuthPopup } from '../../utils/higgsfieldAuth'
 import { compressImage } from '../../utils/imageUtils'
 
 const TONES = [['excited', 'Excited'], ['honest', 'Calm & honest'], ['funny', 'Funny'], ['luxury', 'Luxury'], ['educational', 'Educational']]
@@ -36,12 +35,13 @@ export default function UgcCreator() {
   const actorFile = useRef(null)
 
   useEffect(() => { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30))) } catch {} }, [history])
+  const hf = useHiggsfield()
   useEffect(() => {
-    if (!isHFConnected()) return
+    if (!hf.connected) return
     let alive = true
     estimateUgcCost(duration, quality).then(c => alive && setCost(c))
     return () => { alive = false }
-  }, [duration, quality])
+  }, [duration, quality, hf.connected])
 
   const people = influencers.filter(i => i.mainImage)
 
@@ -70,7 +70,7 @@ export default function UgcCreator() {
     const s = scripts[pick]
     if (!s?.lines?.trim()) return
     setError(null)
-    if (!isHFConnected()) { try { await startHiggsfieldOAuthPopup() } catch { return } }
+    if (!hf.connected && !(await hf.connect().catch(e => { setError(e.message); return false }))) return
     setGen(0)
     try {
       const url = await makeUgcVideo({
@@ -93,6 +93,7 @@ export default function UgcCreator() {
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <ErrorNote onClose={() => setError(null)}>{error}</ErrorNote>
+      <HiggsfieldNotice what="Filming UGC ads" />
       <div className="lavi-ugc" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, alignItems: 'start' }}>
         <Card style={{ padding: 22 }}>
           {stepHead(1, 'Product', 'Paste a link or describe it')}

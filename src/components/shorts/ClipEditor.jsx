@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Card, Btn, Label, Segmented, Progress, Toggle, CopyBtn, inputStyle, ScoreBadge, ErrorNote, downloadBlob, downloadUrl, slug } from './ui'
+import { Card, Btn, Label, Segmented, Progress, Toggle, CopyBtn, inputStyle, ScoreBadge, ErrorNote, HiggsfieldNotice, useHiggsfield, downloadBlob, downloadUrl, slug } from './ui'
 import { drawFrame, buildCaptionGroups, renderClip, ensureFonts, CAPTION_STYLES, DEFAULT_OPTIONS, OUT_W, OUT_H } from '../../utils/shorts/render'
 import { analyzeFraming } from '../../utils/shorts/reframe'
 import { GRADES } from '../../utils/shorts/ai'
 import { fmtTime } from '../../utils/shorts/transcribe'
 import { putBlob, getBlob } from '../../utils/shorts/db'
 import { dubClip, DUB_LANGUAGES } from '../../utils/shorts/hf'
-import { isHFConnected, startHiggsfieldOAuthPopup } from '../../utils/higgsfieldAuth'
 
 const LAYOUTS = [['auto', 'Auto'], ['track', 'Follow face'], ['split', 'Split'], ['fit', 'Fit'], ['center', 'Center']]
 
@@ -113,10 +112,12 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
     } finally { setRendering(null); abortRef.current = null }
   }
 
+  const hf = useHiggsfield()
+
   async function dub() {
     if (!renderMeta?.blob) return
     setError(null)
-    if (!isHFConnected()) { try { await startHiggsfieldOAuthPopup() } catch { return } }
+    if (!hf.connected && !(await hf.connect().catch(e => { setError(e.message); return false }))) return
     setDubbing(0)
     try {
       const url = await dubClip(renderMeta.blob, dubLang, { onProgress: setDubbing })
@@ -235,6 +236,7 @@ export default function ClipEditor({ project, clip, srcUrl, onChange, words }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
               <div>
                 <Label hint="lip-synced, via Higgsfield">Dub into another language</Label>
+                <div style={{ marginBottom: 10 }}><HiggsfieldNotice what="Dubbing" /></div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <select value={dubLang} onChange={e => setDubLang(e.target.value)} style={{ ...inputStyle, width: 170, padding: '8px 11px' }}>
                     {DUB_LANGUAGES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}

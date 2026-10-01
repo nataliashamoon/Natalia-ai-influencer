@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react'
-import { Card, Btn, Label, CopyBtn, ErrorNote, Progress, inputStyle, downloadUrl } from './ui'
+import { Card, Btn, Label, CopyBtn, ErrorNote, Progress, HiggsfieldNotice, useHiggsfield, inputStyle, downloadUrl } from './ui'
 import { youtubeKit, chaptersText } from '../../utils/shorts/ai'
 import { fmtTime } from '../../utils/shorts/transcribe'
 import { makeThumbnail } from '../../utils/shorts/hf'
-import { isHFConnected, startHiggsfieldOAuthPopup } from '../../utils/higgsfieldAuth'
 
 export default function YouTubeKit({ project, srcUrl, onChange }) {
   const kit = project.youtube
@@ -31,9 +30,11 @@ export default function YouTubeKit({ project, srcUrl, onChange }) {
     return c.toDataURL('image/jpeg', 0.9)
   }
 
+  const hf = useHiggsfield()
+
   async function genThumb(i) {
     setError(null)
-    if (!isHFConnected()) { try { await startHiggsfieldOAuthPopup() } catch { return } }
+    if (!hf.connected && !(await hf.connect().catch(e => { setError(e.message); return false }))) return
     const t = kit.thumbnails[i]
     setThumbBusy(b => ({ ...b, [i]: 0 }))
     try {
@@ -106,6 +107,7 @@ export default function YouTubeKit({ project, srcUrl, onChange }) {
 
       <Card style={{ padding: 20 }}>
         <Label hint="made with Higgsfield using a frame from your video">Thumbnails</Label>
+        <div style={{ marginBottom: 10 }}><HiggsfieldNotice what="Making thumbnails" /></div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <video ref={videoRef} src={srcUrl} muted playsInline preload="auto" onLoadedMetadata={e => { e.currentTarget.currentTime = frameT }} style={{ width: 200, aspectRatio: '16/9', objectFit: 'cover', borderRadius: 10, background: '#000' }} />
           <div style={{ flex: 1, minWidth: 220 }}>

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { isHFConnected, startHiggsfieldOAuthPopup } from '../../utils/higgsfieldAuth'
 
 export const G = 'linear-gradient(135deg,#EC4899,#8B5CF6)'
 
@@ -107,6 +108,47 @@ export function ScoreBadge({ score }) {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', whiteSpace: 'nowrap', flexShrink: 0, borderRadius: 20, fontSize: 11.5, fontWeight: 800, color, background: `${color}18`, border: `1px solid ${color}40` }}>
       🔥 {score}
     </span>
+  )
+}
+
+// Tracks the Higgsfield connection. The OAuth popup saves the token from its own
+// window, which fires a storage event here, so this updates however you connected.
+export function useHiggsfield() {
+  const [connected, setConnected] = useState(isHFConnected)
+  useEffect(() => {
+    const sync = () => setConnected(isHFConnected())
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('focus', sync) }
+  }, [])
+  // Resolves true once connected, false if the popup was closed; throws on real errors.
+  async function connect() {
+    try { await startHiggsfieldOAuthPopup() } catch (e) { if (e.message !== 'cancelled') throw e }
+    const ok = isHFConnected()
+    setConnected(ok)
+    return ok
+  }
+  return { connected, connect }
+}
+
+// Shown wherever a Shorts feature runs on the user's Higgsfield account, so the
+// sign-in isn't a surprise popup halfway through.
+export function HiggsfieldNotice({ what }) {
+  const { connected, connect } = useHiggsfield()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  if (connected) return null
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', padding: '11px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.25)', fontSize: 13, lineHeight: 1.5, color: 'var(--text-primary)' }}>
+      <span style={{ flex: 1, minWidth: 200 }}>
+        {what} uses your Higgsfield account and credits. Connect it once and you're set.
+        {error && <span style={{ display: 'block', color: '#E5372C', marginTop: 4 }}>{error}</span>}
+      </span>
+      <Btn size="sm" disabled={busy} onClick={async () => {
+        setBusy(true); setError(null)
+        try { await connect() } catch (e) { setError(e.message) } finally { setBusy(false) }
+      }}>{busy ? 'Connecting…' : 'Connect Higgsfield'}</Btn>
+    </div>
   )
 }
 

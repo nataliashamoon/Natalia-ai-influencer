@@ -1,6 +1,7 @@
 // Higgsfield-powered steps for Shorts Studio: dubbing, thumbnails and UGC actor videos.
 // Everything runs on the user's own Higgsfield account through the existing MCP proxy.
 
+import { toStandardMp4 } from './remux'
 import { initSession, callTool, unwrapMCP, extractJobIds, isHFErrorText, pollVideoJobs, uploadBlobForId, generateSingleImage } from '../higgsfieldGenerate'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
@@ -48,9 +49,11 @@ export async function toMediaId(src, type = 'image') {
 }
 
 export async function dubClip(blob, language, { onProgress, isCancelled } = {}) {
+  onProgress?.(0.02)
+  const video = await toStandardMp4(blob) // Higgsfield rejects MediaRecorder's fragmented MP4
   await initSession()
   onProgress?.(0.05)
-  const { id } = await uploadBlobForId(blob, { type: 'video' })
+  const { id } = await uploadBlobForId(video, { type: 'video' })
   onProgress?.(0.25)
   const res = await callTool('dubbing', { params: { video_id: id, target_language: language } })
   const jobIds = jobIdsExcluding(res, [id])

@@ -122,6 +122,8 @@ const productPlugin = {
 export default defineConfig({
   plugins: [react(), searchPlugin, imgProxyPlugin, claudePlugin, productPlugin],
   worker: { format: 'es' },
+  // ffmpeg.wasm spawns its own module worker; pre-bundling breaks its import.meta.url
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
   server: {
     proxy: {
       '/api/hf': {

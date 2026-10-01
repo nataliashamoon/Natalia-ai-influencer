@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, Btn, Label, Segmented, Progress, ErrorNote, inputStyle, G } from './ui'
+import { Card, Btn, Label, Segmented, Progress, ErrorNote, inputStyle, G, downloadBlob, slug } from './ui'
 import ClipEditor from './ClipEditor'
 import ClipCard from './ClipCard'
 import { analyzeClipFraming } from './useClipActions'
+import { zipFiles } from '../../utils/shorts/zip'
 import YouTubeKit from './YouTubeKit'
 import { decodeAudio, transcribeAudio, wordsToSegments, fmtTime } from '../../utils/shorts/transcribe'
 import { detectMoments } from '../../utils/shorts/ai'
@@ -43,7 +44,9 @@ export default function ClipGenerator({ mode = 'clips' }) {
   const [error, setError] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [playingId, setPlayingId] = useState(null)
-  const [exportQueue, setExportQueue] = useState([]) // clip ids left to export for "Download all"
+  const [exportQueue, setExportQueue] = useState([]) // clip ids left to render for "Download all"
+  const [zipping, setZipping] = useState(false)
+  const zipParts = useRef([])
   const [view, setView] = useState(mode === 'youtube' ? 'youtube' : 'clips')
   const [dragging, setDragging] = useState(false)
   const fileInput = useRef(null)
@@ -136,6 +139,27 @@ export default function ClipGenerator({ mode = 'clips' }) {
 
   const editing = project?.clips.find(c => c.id === editingId)
 
+  function downloadAll() {
+    setPlayingId(null); setError(null)
+    zipParts.current = []
+    setExportQueue(project.clips.map(c => c.id))
+  }
+
+  // Each card renders in turn and hands back its file; after the last one,
+  // everything goes out as a single ZIP.
+  async function finishQueued(part) {
+    if (part) zipParts.current.push(part)
+    if (exportQueue.length > 1) { setExportQueue(q => q.slice(1)); return }
+    setExportQueue([])
+    const parts = zipParts.current; zipParts.current = []
+    if (!parts.length) { setError('None of the clips could be rendered.'); return }
+    if (parts.length < project.clips.length) setError(`${project.clips.length - parts.length} clip(s) couldn't be rendered and were left out of the ZIP.`)
+    setZipping(true)
+    try { downloadBlob(await zipFiles(parts), `${slug(project.name)}-clips.zip`) }
+    catch (e) { setError(`Couldn't build the ZIP: ${e.message}`) }
+    finally { setZipping(false) }
+  }
+
   // Face-track the feed's clips in the background, one at a time, so previews
   // and exports use the smart crop. The editor tracks its own clip when open.
   const framingNext = !editingId && project?.clips.find(c => !c.framing)
@@ -215,8 +239,8 @@ export default function ClipGenerator({ mode = 'clips' }) {
                     {project.clips.some(c => c.offline) && <> · picked by the offline scorer — add a Claude key in <a href="/settings" style={{ color: '#8B5CF6', fontWeight: 700 }}>Settings</a> for AI picks, hooks and captions</>}
                   </span>
                   <Btn kind="ghost" size="sm" onClick={addMore}>+ Find more clips</Btn>
-                  <Btn size="sm" disabled={exportQueue.length > 0} onClick={() => { setPlayingId(null); setExportQueue(project.clips.map(c => c.id)) }}>
-                    {exportQueue.length ? `Downloading… ${project.clips.length - exportQueue.length + 1}/${project.clips.length}` : '⬇ Download all'}
+                  <Btn size="sm" disabled={exportQueue.length > 0 || zipping} onClick={downloadAll}>
+                    {exportQueue.length ? `Rendering… ${project.clips.length - exportQueue.length + 1}/${project.clips.length}` : zipping ? 'Zipping…' : '⬇ Download all'}
                   </Btn>
                 </div>
                 <div className="lavi-feed" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 18, alignItems: 'start' }}>
@@ -232,7 +256,7 @@ export default function ClipGenerator({ mode = 'clips' }) {
                       onChange={updateClip}
                       onEdit={() => setEditingId(c.id)}
                       queued={exportQueue[0] === c.id}
-                      onQueueDone={() => setExportQueue(q => q.slice(1))}
+                      onQueueDone={finishQueued}
                     />
                   ))}
                 </div>

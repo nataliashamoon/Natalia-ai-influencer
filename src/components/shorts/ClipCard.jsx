@@ -34,14 +34,16 @@ export default function ClipCard({ index, clip, project, srcUrl, playing, onPlay
   const [postNote, setPostNote] = useState(false)
   const busy = rendering != null || dubbing != null
 
-  // "Download all" exports clips one at a time through this queue
+  // "Download all" renders clips one at a time through this queue and hands each file back
   const ranQueue = useRef(false)
   useEffect(() => {
     if (!queued) { ranQueue.current = false; return }
     if (ranQueue.current) return
     ranQueue.current = true
     onPlayingChange(false)
-    actions.exportClip().finally(onQueueDone)
+    actions.ensureRender()
+      .then(out => onQueueDone(out && { name: `${String(index + 1).padStart(2, '0')}-${slug(clip.title)}.${out.ext}`, blob: out.blob }))
+      .catch(() => onQueueDone(null))
   }, [queued])
 
   async function post() {
@@ -83,7 +85,7 @@ export default function ClipCard({ index, clip, project, srcUrl, playing, onPlay
       <ErrorNote onClose={() => setError(null)}>{error}</ErrorNote>
       {rendering != null && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ flex: 1 }}><Progress value={rendering} label={queued ? 'Exporting for Download all…' : 'Rendering…'} sub={`${Math.round(rendering * 100)}% · keep this tab open`} /></div>
+          <div style={{ flex: 1 }}><Progress value={rendering} label={queued ? 'Rendering for Download all…' : 'Rendering…'} sub={`${Math.round(rendering * 100)}% · keep this tab open`} /></div>
           <Btn size="sm" kind="ghost" onClick={actions.cancel}>Cancel</Btn>
         </div>
       )}

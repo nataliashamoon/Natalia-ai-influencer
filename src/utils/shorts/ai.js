@@ -185,9 +185,17 @@ export async function ugcScripts({ product, audience = '', tone = 'excited', dur
   const words = Math.round(duration * 2.6)
   if (!hasClaudeKey()) {
     const name = product.name || 'this'
+    // Keep whole sentences that fit the spoken length; the hook and CTA always stay.
+    const hook = `Okay, I need to tell you about ${name}.`
+    const end = cta || 'Link is below, go try it.'
+    const count = t => t.split(/\s+/).filter(Boolean).length
+    let lines = hook
+    for (const extra of [product.description ? product.description.split('.')[0] + '.' : '', "I've been using it every day and honestly I'm obsessed."]) {
+      if (extra && count(`${lines} ${extra} ${end}`) <= words) lines += ` ${extra}`
+    }
     return [{
       angle: 'Honest discovery',
-      lines: `Okay, I need to tell you about ${name}. ${product.description ? product.description.split('.')[0] + '.' : ''} I've been using it every day and honestly I'm obsessed. ${cta || 'Link is below, go try it.'}`.trim(),
+      lines: `${lines} ${end}`.trim(),
       setting: 'bright apartment', action: 'holding the product up to the camera',
     }]
   }

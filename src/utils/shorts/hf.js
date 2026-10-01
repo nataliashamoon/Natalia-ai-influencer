@@ -1,7 +1,7 @@
 // Higgsfield-powered steps for Shorts Studio: dubbing, thumbnails and UGC actor videos.
 // Everything runs on the user's own Higgsfield account through the existing MCP proxy.
 
-import { initSession, callTool, unwrapMCP, extractJobIds, pollVideoJobs, uploadBlobForId, generateSingleImage } from '../higgsfieldGenerate'
+import { initSession, callTool, unwrapMCP, extractJobIds, isHFErrorText, pollVideoJobs, uploadBlobForId, generateSingleImage } from '../higgsfieldGenerate'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
@@ -14,7 +14,7 @@ export const DUB_LANGUAGES = [
 
 function hfError(res) {
   const raw = JSON.stringify(unwrapMCP(res) ?? '')
-  const m = raw.match(/(Error[^"\\]{0,160}|insufficient[^"\\]{0,120}|not enough credits[^"\\]{0,80})/i)
+  const m = raw.match(/(Something went wrong[^"\\]{0,40}|Error[^"\\]{0,160}|insufficient[^"\\]{0,120}|not enough credits[^"\\]{0,80})/i)
   return m ? m[0].replace(/\\n/g, ' ') : null
 }
 
@@ -25,14 +25,23 @@ function jobIdsExcluding(res, exclude = []) {
   return ids
 }
 
-// dataURL / blob / https url → Higgsfield media id
+// dataURL / blob / url → Higgsfield media id
 export async function toMediaId(src, type = 'image') {
   if (!src) return null
   if (src instanceof Blob) return (await uploadBlobForId(src, { type })).id
-  if (src.startsWith('data:')) return (await uploadBlobForId(await (await fetch(src)).blob(), { type })).id
-  const res = await callTool('media_import_url', { url: src })
+  // Data URLs and this app's own files (e.g. /kayla/main.jpg) are uploaded from the
+  // browser: Higgsfield can't fetch a relative path, or a preview behind Vercel login.
+  const url = new URL(src, window.location.href)
+  if (src.startsWith('data:') || url.origin === window.location.origin) {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`Could not load image (${r.status})`)
+    return (await uploadBlobForId(await r.blob(), { type })).id
+  }
+  const res = await callTool('media_import_url', { url: url.toString() })
   const data = unwrapMCP(res)
-  const id = data?.media_id || data?.id || (JSON.stringify(data ?? '').match(UUID) || [])[0]
+  const text = JSON.stringify(data ?? '')
+  if (isHFErrorText(typeof data === 'string' ? data : '')) throw new Error(`Higgsfield couldn't import that image: ${String(data).split('\n')[0]}`)
+  const id = data?.media_id || data?.id || (text.replace(/request[ _-]?id\W*[0-9a-f-]{36}/gi, '').match(UUID) || [])[0]
   if (!id) throw new Error('Could not import image into Higgsfield')
   return id
 }

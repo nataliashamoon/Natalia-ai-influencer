@@ -291,6 +291,10 @@ function unwrapMCP(result) {
   return result
 }
 
+function isHFErrorText(s) {
+  return /something went wrong|internal server error|^\s*"?error\b/i.test(String(s ?? ''))
+}
+
 function extractJobIds(result) {
   const data = unwrapMCP(result)
 
@@ -304,8 +308,10 @@ function extractJobIds(result) {
     if (typeof data.id === 'string' && data.id.length >= 8) return [data.id]
   }
 
-  // Plain-text response: extract UUIDs embedded in the description
-  const str = typeof data === 'string' ? data : JSON.stringify(data ?? '')
+  // Plain-text response: extract UUIDs embedded in the description. Error replies
+  // ("Something went wrong… Request ID: <uuid>") carry a request id, not a job id.
+  const str = (typeof data === 'string' ? data : JSON.stringify(data ?? '')).replace(/request[ _-]?id\W*[0-9a-f-]{36}/gi, '')
+  if (isHFErrorText(str)) return []
   const uuids = str.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []
   hflog('[HF] extracted UUIDs from text:', uuids)
   return [...new Set(uuids)]
@@ -351,6 +357,8 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
   const urls = []
   const shareUrls = []
   const softRetries = new Map() // jobId → count of rounds seen as soft-terminal with no URL
+  const errorRounds = new Map() // jobId → consecutive rounds where job_status answered with an error
+  let lastError = null
 
   for (let round = 0; round < 270; round++) { // 270 × 2s = 9 minutes max
     if (isCancelled?.()) throw new Error('CANCELLED')
@@ -372,6 +380,18 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
         const shareUrl = resultsObj?.shareUrl || resultsObj?.share_url || item?.shareUrl || item?.share_url
           || extractShareUrls(result)[0] || null
         const status = (item?.status || data?.status || '').toLowerCase()
+
+        if (!url && typeof data === 'string' && isHFErrorText(data)) {
+          const n = (errorRounds.get(jobId) || 0) + 1
+          errorRounds.set(jobId, n)
+          if (n >= 5) {
+            pending.delete(jobId)
+            lastError = data.split('\n')[0]
+            console.warn('[HF-VID] job', jobId.slice(0, 8), 'status keeps erroring:', lastError)
+          }
+          continue
+        }
+        errorRounds.delete(jobId)
 
         if (url) {
           pending.delete(jobId)
@@ -412,7 +432,7 @@ async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCanc
     onProgress?.(100)
     return { urls: urls.slice(0, total), shareUrls: shareUrls.slice(0, total) }
   }
-  if (pending.size === 0) throw new Error('Video generation failed — all jobs ended without output')
+  if (pending.size === 0) throw new Error(lastError ? `Higgsfield: ${lastError}` : 'Video generation failed — all jobs ended without output')
   throw new Error('Video generation timed out — check Higgsfield dashboard')
 }
 
@@ -1120,7 +1140,7 @@ export async function generatePosePreviews(influencer, onPoseComplete, { stance 
 }
 
 // ── Low-level access for features that call other Higgsfield tools (Shorts Studio) ──
-export { callTool, unwrapMCP, extractJobIds, pollVideoJobs, uploadRefImage }
+export { callTool, unwrapMCP, extractJobIds, isHFErrorText, pollVideoJobs, uploadRefImage }
 
 // Upload a Blob/File and return both the Higgsfield media id and its CDN url.
 // Tools such as dubbing and video_analysis need the id, not the url.

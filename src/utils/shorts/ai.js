@@ -109,7 +109,7 @@ function heuristicMoments(segments, count, minLen, maxLen) {
     start: c.start, end: c.end, score: c.score,
     title: c.first.split(/\s+/).slice(0, 7).join(' '),
     hook: c.first.split(/\s+/).slice(0, 7).join(' ').replace(/[.,]$/, ''),
-    reason: 'Picked by the offline scorer (add a Claude key in Settings for AI picks).',
+    reason: '', offline: true,
     caption: c.first, hashtags: ['fyp', 'viral', 'shorts'], grade: 'punchy', emphasis: [],
     textForClip: c.text.trim(),
   }))

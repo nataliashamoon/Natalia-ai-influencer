@@ -275,7 +275,13 @@ export async function renderClip({ src, clip, words, framing, options, onProgres
   const srcNode = actx.createMediaElementSource(video)
   const dest = actx.createMediaStreamDestination()
   srcNode.connect(dest)
-  await actx.resume().catch(() => {})
+  // Browsers only start audio after the user has clicked on the page; without
+  // that, resume() never settles, so don't wait on it forever.
+  await Promise.race([actx.resume().catch(() => {}), new Promise(r => setTimeout(r, 3000))])
+  if (actx.state !== 'running') {
+    actx.close?.(); video.removeAttribute('src'); video.load()
+    throw new Error('Your browser blocked audio for this export. Click anywhere on the page, then try again.')
+  }
 
   const stream = canvas.captureStream(30)
   dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr))
@@ -290,7 +296,10 @@ export async function renderClip({ src, clip, words, framing, options, onProgres
 
   const done = new Promise(resolve => { rec.onstop = resolve })
   rec.start(250)
-  await video.play()
+  try { await video.play() } catch (e) {
+    rec.stop(); actx.close?.()
+    throw new Error(e.name === 'NotAllowedError' ? 'Your browser blocked playback for this export. Click anywhere on the page, then try again.' : `Couldn't play the video: ${e.message}`)
+  }
 
   const dur = clip.end - clip.start
   await new Promise((resolve, reject) => {
